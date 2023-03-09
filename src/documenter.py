@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 import atexit
 import shutil
 import yaml
+from typing import Optional
 
 class Documenter:
     """ Class that makes network runs self-documenting. All output data including the saved
     model, log file, parameter file and plots are saved into an output folder. """
 
     @staticmethod
-    def from_saved_run(run_name, read_only=False):
+    def from_saved_run(run_name: str, read_only: bool = False):
         """ Create a documenter from an existing output folder. Return the documenter and the
         parameter dictionary. """
         doc = Documenter(run_name[16:], existing_run=run_name, read_only=read_only)
@@ -19,7 +20,7 @@ class Documenter:
         return doc, params
 
     @staticmethod
-    def from_param_file(param_file):
+    def from_param_file(param_file: str):
         """ Create a documenter with the run name from param_file and copy the parameter file
         into the output folder. Return the documenter and the parameter dictionary. """
         with open(param_file) as f:
@@ -28,7 +29,12 @@ class Documenter:
         shutil.copy(param_file, doc.add_file("params.yaml", False))
         return doc, params
 
-    def __init__(self, run_name, existing_run=None, read_only=False):
+    def __init__(
+        self,
+        run_name: str,
+        existing_run: Optional[str] = None,
+        read_only: bool = False
+    ):
         """ If existing_run is None, a new output folder named as run_name prefixed by date
         and time is created. stdout and stderr are redirected into a log file. The method
         close is registered to be automatically called when the program exits. """
@@ -51,7 +57,7 @@ class Documenter:
             self.tee = Tee(self.add_file("log.txt", False))
             atexit.register(self.close)
 
-    def add_file(self, name, add_run_name=True):
+    def add_file(self, name: str, add_run_name: bool = False):
         """ Returns the path in the output folder for a file with the given name. If
         add_run_name is True, the run name is appended to the file name. If a file with
         the same name already exists in the output folder, it is moved to a subfolder 'old'.
@@ -63,7 +69,7 @@ class Documenter:
             shutil.move(new_file, os.path.join(old_dir, os.path.basename(new_file)))
         return new_file
 
-    def get_file(self, name, add_run_name=True):
+    def get_file(self, name: str, add_run_name: bool = False):
         """ Returns the path in the output folder for a file with the given name. If
         add_run_name is True, the run name is appended to the file name. """
         if add_run_name:
@@ -81,7 +87,7 @@ class Tee:
     """ Class to replace stdout and stderr. It redirects all printed data to std_out as well
     as a log file. """
 
-    def __init__(self, log_file):
+    def __init__(self, log_file: str):
         """ Creates log file and redirects stdout and stderr. """
         self.log_file = open(log_file, "w")
         self.stdout = sys.stdout
