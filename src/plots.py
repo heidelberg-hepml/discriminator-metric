@@ -2,6 +2,7 @@ import warnings
 from collections import namedtuple
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
 
 from .observable import Observable
@@ -11,12 +12,14 @@ class Plots:
         self,
         observables: List[Observable],
         weights_true: np.ndarray,
-        weights_fake: np.ndarray
+        weights_fake: np.ndarray,
+        title: str
     ):
         self.observables = observables
         self.weights_true = weights_true
         self.weights_fake = weights_fake
         self.bayesian = len(self.weights_true.shape) == 2
+        self.title = title
 
         plt.rc("font", family="serif", size=16)
         plt.rc("axes", titlesize="medium")
@@ -26,15 +29,154 @@ class Plots:
 
 
     def plot_roc(self, file: str):
-        #true vs fake
-        #fake vs fake
-        fig, ax = plt.subplots(figsize=(4,3.5))
+        scores = np.concatenate((self.weights_true, self.weights_fake), axis=0)
+        labels = np.concatenate((
+            np.ones_like(self.weights_true),
+            np.zeros_like(self.weights_fake)
+        ), axis=0)
+        index = np.argsort(scores, axis=0)
+        sorted_labels = np.take_along_axis(labels, index, axis=0)
+        tpr = np.concatenate((
+            np.zeros_like(self.weights_true[:1,...]),
+            np.cumsum(sorted_labels, axis=0) / self.weights_true.shape[0]
+        ), axis=0)
+        fpr = np.concatenate((
+            np.zeros_like(self.weights_fake[:1,...]),
+            np.cumsum(1-sorted_labels, axis=0) / self.weights_fake.shape[0]
+        ), axis=0)
+        auc = np.trapz(x=fpr, y=tpr, axis=0)
 
-        pass
+        fig, ax = plt.subplots(figsize=(4,3.5))
+        if self.bayesian:
+            for i in range(self.weights_fake.shape[1]):
+                ax.plot(fpr[:,i], tpr[:,i], alpha=0.3, color=self.colors[0])
+        else:
+            ax.plot(fpr, tpr, color=self.colors[0])
+        ax.plot([0,1], [0,1], color="k", ls="dashed")
+
+        ax.set_xlabel(r"$\epsilon_S$")
+        ax.set_ylabel(r"$\epsilon_B$")
+        ax.text(
+            x = 0.05,
+            y = 0.95,
+            s = f"AUC = {auc:.2f}",
+            horizontalalignment = "left",
+            verticalalignment = "top",
+            transform = ax.transAxes
+        )
+        ax.text(
+            x = 0.95,
+            y = 0.05,
+            s = self.title,
+            horizontalalignment = "right",
+            verticalalignment = "bottom",
+            transform = ax.transAxes
+        )
+        plt.savefig(file)
+        plt.close()
 
 
     def plot_weight_hist(self, file: str):
-        pass
+        with PdfPages(file) as pp:
+            wmin = min(np.min(self.weights_true), np.min(self.weights_fake))
+            wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
+            self.plot_single_weight_hist(
+                file,
+                bins=np.linspace(0, 3, 50),
+                xscale="linear",
+                yscale="linear"
+            )
+            self.plot_single_weight_hist(
+                file,
+                bins=np.logspace(np.log10(wmin), np.log10(wmax), 50),
+                xscale="log",
+                yscale="log"
+            )
+            self.plot_single_weight_hist(
+                file,
+                bins=np.logspace(-2, 1, 50),
+                xscale="log",
+                yscale="log"
+            )
+
+
+    def plot_single_weight_hist(self, file, bins: np.ndarray, xscale: str, yscale: str):
+        weights_combined = np.concatenate((self.weights_true, self.weights_fake), axis=0)
+        if self.bayesian:
+            true_hists = np.stack([
+                np.histogram(
+                    self.weights_true[:,i] / np.mean(self.weights_true[:,i]),
+                    bins=bins
+                ) for i in range(self.weights_true.shape[1])
+            ], axis=1)
+            fake_hists = np.stack([
+                np.histogram(
+                    self.weights_fake[:,i] / np.mean(self.weights_fake[:,i]),
+                    bins=bins
+                ) for i in range(self.weights_fake.shape[1])
+            ], axis=1)
+            combined_hists = np.stack([
+                np.histogram(
+                    weights_combined[:,i] / np.mean(self.weights_combined[:,i]),
+                    bins=bins
+                ) for i in range(weights_combined.shape[1])
+            ], axis=1)
+
+            y_true = np.mean(true_hists, axis=1)
+            y_err_true = np.std(true_hists, axis=1)
+            y_fake = np.mean(fake_hists, axis=1)
+            y_err_fake = np.std(fake_hists, axis=1)
+            y_combined = np.mean(combined_hists, axis=1)
+            y_err_combined = np.std(combined_hists, axis=1)
+
+        else:
+            y_true = np.histogram(self.weights_true, bins=bins)
+            y_true_err = None
+            y_fake = np.histogram(self.weights_fake, bins=bins)
+            y_fake_err = None
+            y_combined = np.histogram(weights_combined, bins=bins)
+            y_combined_err = None
+
+        fig, ax = plt.subplots(figsize=(4, 3.5))
+        self.hist_line(
+            ax,
+            bins,
+            y_combined,
+            y_combined_err,
+            label = "Comb",
+            color = self.color[0]
+        )
+        self.hist_line(
+            ax,
+            bins,
+            y_true,
+            y_true_err,
+            label = "Truth",
+            color = self.color[1]
+        )
+        self.hist_line(
+            ax,
+            bins,
+            y_fake,
+            y_fake_err,
+            label = "Gen",
+            color = self.color[2]
+        )
+        ax.text(
+            x = 0.95,
+            y = 0.95,
+            s = self.title,
+            horizontalalignment = "right",
+            verticalalignment = "top",
+            transform = ax.transAxes
+        )
+        ax.set_xlabel("weight")
+        ax.set_ylabel("normalized")
+        ax.set_xscale(xscale)
+        ax.set_yscale(yscale)
+        ax.set_xlim(bins[0], bins[-1])
+        plt.savefig(file, format="pdf")
+        plt.close()
 
 
     def plot_observables(self, file: str):
@@ -112,6 +254,7 @@ class Plots:
                     ref_scale = 1 / ref_integral if ref_integral != 0. else 1.
 
                 self.hist_line(
+                    axs[0],
                     bins,
                     line.y * scale,
                     line.y_err * scale if line.y_err is not None else None,
@@ -134,7 +277,7 @@ class Plots:
                     else:
                         ratio_err = None
                     ratio[ratio_isnan] = 1.
-                    self.hist_line(bins, ratio, ratio_err, label=None, color=line.color)
+                    self.hist_line(ax, bins, ratio, ratio_err, label=None, color=line.color)
 
             axs[0].legend(loc=legend_pos, frameon=False)
             axs[0].set_ylabel("normalized")
@@ -158,52 +301,6 @@ class Plots:
             plt.close()
 
 
-    def hist_line(
-        self,
-        bins: np.ndarray,
-        y: np.ndarray,
-        y_err: np.ndarray,
-        label: str,
-        color: str,
-        ls: str
-    ):
-        dup_last = lambda a: np.append(a, a[-1])
-
-        axs[0].step(
-            bins,
-            dup_last(y),
-            label = label,
-            color = color,
-            linewidth = 1.0,
-            where = "post",
-        )
-        if y_err is not None:
-            axs[0].step(
-                bins,
-                dup_last(y + y_err),
-                color = color,
-                alpha = 0.5,
-                linewidth = 0.5,
-                where = "post"
-            )
-            axs[0].step(
-                bins,
-                dup_last(y - y_err),
-                color = color,
-                alpha = 0.5,
-                linewidth = 0.5,
-                where = "post"
-            )
-            axs[0].fill_between(
-                bins,
-                dup_last(y - y_err),
-                dup_last(y + y_err),
-                facecolor = color,
-                alpha = 0.3,
-                step = "post"
-            )
-
-
     def plot_clustering(
         self,
         file: str,
@@ -212,7 +309,7 @@ class Plots:
     ):
         with PdfPages(file) as pp:
             for observable in self.observables:
-                self.plot_single_observable(pp, observable)
+                self.plot_single_clustering(pp, observable, low_cutoffs, high_cutoffs)
 
 
     def plot_single_clustering(
@@ -222,3 +319,49 @@ class Plots:
         high_cutoffs: list[float]
     ):
         pass
+
+
+    def hist_line(
+        self,
+        ax: mpl.axes.Axes,
+        bins: np.ndarray,
+        y: np.ndarray,
+        y_err: np.ndarray,
+        label: str,
+        color: str
+    ):
+        dup_last = lambda a: np.append(a, a[-1])
+
+        ax.step(
+            bins,
+            dup_last(y),
+            label = label,
+            color = color,
+            linewidth = 1.0,
+            where = "post",
+        )
+        if y_err is not None:
+            ax.step(
+                bins,
+                dup_last(y + y_err),
+                color = color,
+                alpha = 0.5,
+                linewidth = 0.5,
+                where = "post"
+            )
+            ax.step(
+                bins,
+                dup_last(y - y_err),
+                color = color,
+                alpha = 0.5,
+                linewidth = 0.5,
+                where = "post"
+            )
+            ax.fill_between(
+                bins,
+                dup_last(y - y_err),
+                dup_last(y + y_err),
+                facecolor = color,
+                alpha = 0.3,
+                step = "post"
+            )
