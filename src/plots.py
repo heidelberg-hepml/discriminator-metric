@@ -28,6 +28,61 @@ class Plots:
         self.colors = [f"C{i}" for i in range(10)]
 
 
+    def plot_losses(self, file: str, losses: dict):
+        with PdfPages(file) as pdf:
+            self.plot_single_loss(
+                pdf,
+                "loss",
+                (losses["train_loss"], losses["test_loss"]),
+                ("train", "test")
+            )
+            if self.bayesian:
+                self.plot_single_loss(
+                    pdf,
+                    "BCE loss",
+                    (losses["train_bce_loss"], losses["test_bce_loss"]),
+                    ("train", "test")
+                )
+                self.plot_single_loss(
+                    pdf,
+                    "KL loss",
+                    (losses["train_kl_loss"], losses["test_kl_loss"]),
+                    ("train", "test")
+                )
+            self.plot_single_loss(
+                pdf,
+                "learning rate",
+                (losses["lr"], ),
+                (None, )
+            )
+
+
+    def plot_single_loss(
+        self,
+        pdf: PdfPages,
+        ylabel: str,
+        curves: tuple[np.ndarray],
+        labels: tuple[str]
+    ):
+        fig, ax = plt.subplots(figsize=(4,3.5))
+        for i, (curve, label) in enumerate(zip(curves, labels)):
+            epochs = np.arange(1, len(curve)+1)
+            ax.plot(epochs, curve, label=label)
+        ax.legend(frameon=False)
+        ax.set_xlabel("epoch")
+        ax.set_ylabel(ylabel)
+        ax.text(
+            x = 0.95,
+            y = 0.95,
+            s = self.title,
+            horizontalalignment = "right",
+            verticalalignment = "top",
+            transform = ax.transAxes
+        )
+        plt.savefig(pdf, format="pdf")
+        plt.close()
+
+
     def plot_roc(self, file: str):
         scores = np.concatenate((self.weights_true, self.weights_fake), axis=0)
         labels = np.concatenate((
@@ -77,30 +132,36 @@ class Plots:
 
 
     def plot_weight_hist(self, file: str):
-        with PdfPages(file) as pp:
+        with PdfPages(file) as pdf:
             wmin = min(np.min(self.weights_true), np.min(self.weights_fake))
             wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
             self.plot_single_weight_hist(
-                file,
+                pdf,
                 bins=np.linspace(0, 3, 50),
                 xscale="linear",
                 yscale="linear"
             )
             self.plot_single_weight_hist(
-                file,
+                pdf,
                 bins=np.logspace(np.log10(wmin), np.log10(wmax), 50),
                 xscale="log",
                 yscale="log"
             )
             self.plot_single_weight_hist(
-                file,
+                pdf,
                 bins=np.logspace(-2, 1, 50),
                 xscale="log",
                 yscale="log"
             )
 
 
-    def plot_single_weight_hist(self, file, bins: np.ndarray, xscale: str, yscale: str):
+    def plot_single_weight_hist(
+        self,
+        pdf: PdfPages,
+        bins: np.ndarray,
+        xscale: str,
+        yscale: str
+    ):
         weights_combined = np.concatenate((self.weights_true, self.weights_fake), axis=0)
         if self.bayesian:
             true_hists = np.stack([
@@ -180,12 +241,12 @@ class Plots:
 
 
     def plot_observables(self, file: str):
-        with PdfPages(file) as pp:
+        with PdfPages(file) as pdf:
             for observable in self.observables:
-                self.plot_single_observable(pp, observable)
+                self.plot_single_observable(pdf, observable)
 
 
-    def plot_single_observable(self, file, observable: Observable):
+    def plot_single_observable(self, pdf: PdfPages, observable: Observable):
         bins = observable.bins
 
         if self.bayesian:
@@ -238,7 +299,7 @@ class Plots:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            
+
             fig, axs = plt.subplots(
                 2, 1,
                 sharex = True,
@@ -279,7 +340,7 @@ class Plots:
                     ratio[ratio_isnan] = 1.
                     self.hist_line(ax, bins, ratio, ratio_err, label=None, color=line.color)
 
-            axs[0].legend(loc=legend_pos, frameon=False)
+            axs[0].legend(frameon=False)
             axs[0].set_ylabel("normalized")
             axs[0].set_yscale(observable.yscale)
 
@@ -296,8 +357,8 @@ class Plots:
             axs[0].set_xlabel(f"${{{observable.tex_label}}}${unit}")
             axs[0].set_xscale(xscale)
             axs[0].set_xlim(bins[0], bins[-1])
-                
-            plt.savefig(file, format="pdf")
+
+            plt.savefig(pdf, format="pdf")
             plt.close()
 
 
@@ -307,13 +368,14 @@ class Plots:
         low_cutoffs: list[float],
         high_cutoffs: list[float]
     ):
-        with PdfPages(file) as pp:
+        with PdfPages(file) as pdf:
             for observable in self.observables:
-                self.plot_single_clustering(pp, observable, low_cutoffs, high_cutoffs)
+                self.plot_single_clustering(pdf, observable, low_cutoffs, high_cutoffs)
 
 
     def plot_single_clustering(
         self,
+        pdf: PdfPages,
         observable: Observable,
         low_cutoffs: list[float],
         high_cutoffs: list[float]
