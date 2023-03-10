@@ -5,11 +5,18 @@ import torch.nn as nn
 import numpy as np
 
 class VBLinear(nn.Module):
-    def __init__(self, in_features, out_features, prior_prec=1.0, _map=False, std_init=-9):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        prior_prec: float = 1.0,
+        enable_map: bool = False,
+        std_init: float = -9
+    ):
         super(VBLinear, self).__init__()
         self.n_in = in_features
         self.n_out = out_features
-        self.map = _map
+        self.map = enable_map
         self.prior_prec = prior_prec
         self.random = None
         self.bias = nn.Parameter(torch.Tensor(out_features))
@@ -27,14 +34,7 @@ class VBLinear(nn.Module):
     def reset_random(self):
         self.random = None
 
-    def sample_random_state(self):
-        return torch.randn_like(self.logsig2_w).detach().cpu().numpy()
-
-    def import_random_state(self, state):
-        self.random = torch.tensor(state, device=self.logsig2_w.device,
-                                   dtype=self.logsig2_w.dtype)
-
-    def KL(self, loguniform=False):
+    def KL(self, loguniform: bool = False):
         if loguniform:
             k1 = 0.63576; k2 = 1.87320; k3 = 1.48695
             log_alpha = self.logsig2_w - 2 * torch.log(self.mu_w.abs() + 1e-8)
@@ -46,7 +46,7 @@ class VBLinear(nn.Module):
                         - logsig2_w - 1 - np.log(self.prior_prec)).sum()
         return kl
 
-    def forward(self, input):
+    def forward(self, input: torch.Tensor):
         if self.training:
             # local reparameterization trick is more efficient and leads to
             # an estimate of the gradient with smaller variance.
