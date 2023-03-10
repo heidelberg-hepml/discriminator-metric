@@ -10,7 +10,7 @@ from .observable import Observable
 class Plots:
     def __init__(
         self,
-        observables: List[Observable],
+        observables: list[Observable],
         weights_true: np.ndarray,
         weights_fake: np.ndarray,
         title: str
@@ -178,7 +178,7 @@ class Plots:
             ], axis=1)
             combined_hists = np.stack([
                 np.histogram(
-                    weights_combined[:,i] / np.mean(self.weights_combined[:,i]),
+                    weights_combined[:,i] / np.mean(weights_combined[:,i]),
                     bins=bins
                 ) for i in range(weights_combined.shape[1])
             ], axis=1)
@@ -205,7 +205,7 @@ class Plots:
             y_combined,
             y_combined_err,
             label = "Comb",
-            color = self.color[0]
+            color = self.colors[0]
         )
         self.hist_line(
             ax,
@@ -213,7 +213,7 @@ class Plots:
             y_true,
             y_true_err,
             label = "Truth",
-            color = self.color[1]
+            color = self.colors[1]
         )
         self.hist_line(
             ax,
@@ -221,7 +221,7 @@ class Plots:
             y_fake,
             y_fake_err,
             label = "Gen",
-            color = self.color[2]
+            color = self.colors[2]
         )
         ax.text(
             x = 0.95,
@@ -236,7 +236,7 @@ class Plots:
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlim(bins[0], bins[-1])
-        plt.savefig(file, format="pdf")
+        plt.savefig(pdf, format="pdf")
         plt.close()
 
 
@@ -355,7 +355,7 @@ class Plots:
 
             unit = "" if observable.unit is None else f" [{unit}]"
             axs[0].set_xlabel(f"${{{observable.tex_label}}}${unit}")
-            axs[0].set_xscale(xscale)
+            axs[0].set_xscale(observable.xscale)
             axs[0].set_xlim(bins[0], bins[-1])
 
             plt.savefig(pdf, format="pdf")

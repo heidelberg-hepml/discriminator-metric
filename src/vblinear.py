@@ -35,15 +35,9 @@ class VBLinear(nn.Module):
         self.random = None
 
     def KL(self, loguniform: bool = False):
-        if loguniform:
-            k1 = 0.63576; k2 = 1.87320; k3 = 1.48695
-            log_alpha = self.logsig2_w - 2 * torch.log(self.mu_w.abs() + 1e-8)
-            kl = -th.sum(k1 * torch.sigmoid(k2 + k3 * log_alpha)
-                         - 0.5 * F.softplus(-log_alpha) - k1)
-        else:
-            logsig2_w = self.logsig2_w.clamp(-11, 11)
-            kl = 0.5 * (self.prior_prec * (self.mu_w.pow(2) + logsig2_w.exp())
-                        - logsig2_w - 1 - np.log(self.prior_prec)).sum()
+        logsig2_w = self.logsig2_w.clamp(-11, 11)
+        kl = 0.5 * (self.prior_prec * (self.mu_w.pow(2) + logsig2_w.exp())
+                    - logsig2_w - 1 - np.log(self.prior_prec)).sum()
         return kl
 
     def forward(self, input: torch.Tensor):

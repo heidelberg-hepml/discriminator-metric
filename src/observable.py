@@ -5,8 +5,8 @@ import numpy as np
 
 @dataclass
 class Observable:
-    true_data: np.ndarray,
-    fake_data: np.ndarray,
+    true_data: np.ndarray
+    fake_data: np.ndarray
     tex_label: str
     bins: np.ndarray
     xscale: str = "linear"

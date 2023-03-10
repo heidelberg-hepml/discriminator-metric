@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 
 from .model import Discriminator
 from .dataset import DiscriminatorData
@@ -70,13 +71,13 @@ class DiscriminatorTraining:
         self.scheduler_type = self.params.get("lr_scheduler", "one_cycle")
         if self.scheduler_type == "step":
             self.scheduler = torch.optim.lr_scheduler.StepLR(
-                self.optim,
+                self.optimizer,
                 step_size = self.params["lr_decay_epochs"],
                 gamma = self.params["lr_decay_factor"],
             )
         elif self.scheduler_type == "one_cycle":
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
-                self.optim,
+                self.optimizer,
                 self.params.get("max_lr", self.params["lr"]*10),
                 epochs = self.params["epochs"],
                 steps_per_epoch=self.train_batches
@@ -163,7 +164,7 @@ class DiscriminatorTraining:
             return w_true, w_fake
 
 
-    def save(self, file):
+    def save(self, file: str):
         torch.save({
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
@@ -171,7 +172,7 @@ class DiscriminatorTraining:
         }, file)
 
 
-    def load(self):
+    def load(self, file: str):
         state_dicts = torch.load(file, map_location=self.device)
         self.optimizer.load_state_dict(state_dicts["optimizer"])
         self.model.load_state_dict(state_dicts["model"])
