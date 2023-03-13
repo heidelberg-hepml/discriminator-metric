@@ -120,7 +120,8 @@ class DiscriminatorTraining:
                 self.scheduler.step()
 
             test_loss, test_bce_loss, test_kl_loss = self.test_loss()
-            self.losses["train_loss"].append(torch.stack(epoch_losses).mean())
+            train_loss = torch.stack(epoch_losses).mean()
+            self.losses["train_loss"].append(train_loss)
             self.losses["test_loss"].append(test_loss)
             self.losses["lr"].append(self.optimizer.param_groups[0]["lr"])
             if self.bayesian:
@@ -128,6 +129,8 @@ class DiscriminatorTraining:
                 self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean())
                 self.losses["test_bce_loss"].append(test_bce_loss)
                 self.losses["test_kl_loss"].append(test_kl_loss)
+                print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
+                      f"test loss {test_loss:.6f}")
 
 
     def test_loss(self):
