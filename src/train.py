@@ -27,15 +27,15 @@ class DiscriminatorTraining:
                 "train_loss": [],
                 "train_bce_loss": [],
                 "train_kl_loss": [],
-                "test_loss": [],
-                "test_bce_loss": [],
-                "test_kl_loss": []
+                "val_loss": [],
+                "val_bce_loss": [],
+                "val_kl_loss": []
             }
         else:
             self.losses = {
                 "lr": [],
                 "train_loss": [],
-                "test_loss": []
+                "val_loss": []
             }
 
 
@@ -122,15 +122,15 @@ class DiscriminatorTraining:
             test_loss, test_bce_loss, test_kl_loss = self.test_loss()
             train_loss = torch.stack(epoch_losses).mean()
             self.losses["train_loss"].append(train_loss)
-            self.losses["test_loss"].append(test_loss)
+            self.losses["val_loss"].append(test_loss)
             self.losses["lr"].append(self.optimizer.param_groups[0]["lr"])
             if self.bayesian:
                 self.losses["train_bce_loss"].append(torch.stack(epoch_bce_losses).mean())
                 self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean())
-                self.losses["test_bce_loss"].append(test_bce_loss)
-                self.losses["test_kl_loss"].append(test_kl_loss)
+                self.losses["val_bce_loss"].append(test_bce_loss)
+                self.losses["val_kl_loss"].append(test_kl_loss)
                 print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
-                      f"test loss {test_loss:.6f}")
+                      f"val loss {test_loss:.6f}")
 
 
     def test_loss(self):
@@ -156,11 +156,11 @@ class DiscriminatorTraining:
         with torch.no_grad():
             y_true = torch.cat([
                 self.model(x_true).sigmoid()
-                for x_true in self.val_loader_true
+                for x_true in self.test_loader_true
             ])
             y_fake = torch.cat([
                 self.model(x_fake).sigmoid()
-                for x_fake in self.val_loader_fake
+                for x_fake in self.test_loader_fake
             ])
             w_true = (1 - y_true) / y_true
             w_fake = y_fake / (1 - y_fake)
