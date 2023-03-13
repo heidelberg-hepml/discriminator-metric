@@ -16,9 +16,9 @@ class DiscriminatorTraining:
         self.data = data
 
         self.init_data_loaders()
+        self.model = Discriminator(data.dim, params)
         self.init_optimizer()
         self.init_scheduler()
-        self.model = Discriminator(data.dim, params)
         self.loss = nn.BCEWithLogitsLoss()
         self.bayesian = params.get("bayesian", False)
         if self.bayesian:
@@ -97,7 +97,7 @@ class DiscriminatorTraining:
                 layer.KL() for layer in self.model.bayesian_layers
             ) / self.train_samples
         else:
-            kl_loss = 0
+            kl_loss = torch.tensor(0.)
         loss = bce_loss + kl_loss
         return loss, bce_loss, kl_loss
 
@@ -106,7 +106,7 @@ class DiscriminatorTraining:
         for epoch in range(self.params["epochs"]):
             self.model.train()
             epoch_losses, epoch_bce_losses, epoch_kl_losses = [], [], []
-            for x_true, x_fake in zip(self.train_loader_true, self.train_loader_fake):
+            for i,((x_true, ), (x_fake, )) in enumerate(zip(self.train_loader_true, self.train_loader_fake)):
                 self.optimizer.zero_grad()
                 loss, bce_loss, kl_loss = self.batch_loss(x_true, x_fake)
                 epoch_losses.append(loss.detach())
@@ -119,27 +119,27 @@ class DiscriminatorTraining:
             if self.scheduler_type == "step":
                 self.scheduler.step()
 
-            test_loss, test_bce_loss, test_kl_loss = self.test_loss()
+            val_loss, val_bce_loss, val_kl_loss = self.val_loss()
             train_loss = torch.stack(epoch_losses).mean()
             self.losses["train_loss"].append(train_loss)
-            self.losses["val_loss"].append(test_loss)
+            self.losses["val_loss"].append(val_loss)
             self.losses["lr"].append(self.optimizer.param_groups[0]["lr"])
             if self.bayesian:
                 self.losses["train_bce_loss"].append(torch.stack(epoch_bce_losses).mean())
                 self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean())
-                self.losses["val_bce_loss"].append(test_bce_loss)
-                self.losses["val_kl_loss"].append(test_kl_loss)
-                print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
-                      f"val loss {test_loss:.6f}")
+                self.losses["val_bce_loss"].append(val_bce_loss)
+                self.losses["val_kl_loss"].append(val_kl_loss)
+            print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
+                  f"val loss {val_loss:.6f}")
 
 
-    def test_loss(self):
+    def val_loss(self):
         self.model.eval()
         with torch.no_grad():
             losses = []
             bce_losses = []
             kl_losses = []
-            for x_true, x_fake in zip(self.test_loader_true, self.test_loader_fake):
+            for (x_true, ), (x_fake, ) in zip(self.val_loader_true, self.val_loader_fake):
                 loss, bce_loss, kl_loss = self.batch_loss(x_true, x_fake)
                 losses.append(loss)
                 bce_losses.append(bce_loss)
@@ -155,16 +155,16 @@ class DiscriminatorTraining:
         self.model.eval()
         with torch.no_grad():
             y_true = torch.cat([
-                self.model(x_true).sigmoid()
-                for x_true in self.test_loader_true
+                self.model(x_true).sigmoid().flatten()
+                for (x_true, ) in self.test_loader_true
             ])
             y_fake = torch.cat([
-                self.model(x_fake).sigmoid()
-                for x_fake in self.test_loader_fake
+                self.model(x_fake).sigmoid().flatten()
+                for (x_fake, ) in self.test_loader_fake
             ])
             w_true = (1 - y_true) / y_true
             w_fake = y_fake / (1 - y_fake)
-            return w_true, w_fake
+            return w_true.cpu().numpy(), w_fake.cpu().numpy()
 
 
     def save(self, file: str):

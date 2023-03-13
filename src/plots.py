@@ -33,21 +33,21 @@ class Plots:
             self.plot_single_loss(
                 pdf,
                 "loss",
-                (losses["train_loss"], losses["test_loss"]),
-                ("train", "test")
+                (losses["train_loss"], losses["val_loss"]),
+                ("train", "val")
             )
             if self.bayesian:
                 self.plot_single_loss(
                     pdf,
                     "BCE loss",
-                    (losses["train_bce_loss"], losses["test_bce_loss"]),
-                    ("train", "test")
+                    (losses["train_bce_loss"], losses["val_bce_loss"]),
+                    ("train", "val")
                 )
                 self.plot_single_loss(
                     pdf,
                     "KL loss",
-                    (losses["train_kl_loss"], losses["test_kl_loss"]),
-                    ("train", "test")
+                    (losses["train_kl_loss"], losses["val_kl_loss"]),
+                    ("train", "val")
                 )
             self.plot_single_loss(
                 pdf,
@@ -79,7 +79,7 @@ class Plots:
             verticalalignment = "top",
             transform = ax.transAxes
         )
-        plt.savefig(pdf, format="pdf")
+        plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 
 
@@ -127,7 +127,7 @@ class Plots:
             verticalalignment = "bottom",
             transform = ax.transAxes
         )
-        plt.savefig(file)
+        plt.savefig(file, bbox_inches="tight")
         plt.close()
 
 
@@ -168,19 +168,19 @@ class Plots:
                 np.histogram(
                     self.weights_true[:,i] / np.mean(self.weights_true[:,i]),
                     bins=bins
-                ) for i in range(self.weights_true.shape[1])
+                )[0] for i in range(self.weights_true.shape[1])
             ], axis=1)
             fake_hists = np.stack([
                 np.histogram(
                     self.weights_fake[:,i] / np.mean(self.weights_fake[:,i]),
                     bins=bins
-                ) for i in range(self.weights_fake.shape[1])
+                )[0] for i in range(self.weights_fake.shape[1])
             ], axis=1)
             combined_hists = np.stack([
                 np.histogram(
                     weights_combined[:,i] / np.mean(weights_combined[:,i]),
                     bins=bins
-                ) for i in range(weights_combined.shape[1])
+                )[0] for i in range(weights_combined.shape[1])
             ], axis=1)
 
             y_true = np.mean(true_hists, axis=1)
@@ -191,11 +191,11 @@ class Plots:
             y_err_combined = np.std(combined_hists, axis=1)
 
         else:
-            y_true = np.histogram(self.weights_true, bins=bins)
+            y_true = np.histogram(self.weights_true, bins=bins)[0]
             y_true_err = None
-            y_fake = np.histogram(self.weights_fake, bins=bins)
+            y_fake = np.histogram(self.weights_fake, bins=bins)[0]
             y_fake_err = None
-            y_combined = np.histogram(weights_combined, bins=bins)
+            y_combined = np.histogram(weights_combined, bins=bins)[0]
             y_combined_err = None
 
         fig, ax = plt.subplots(figsize=(4, 3.5))
@@ -236,7 +236,7 @@ class Plots:
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlim(bins[0], bins[-1])
-        plt.savefig(pdf, format="pdf")
+        plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 
 
@@ -265,7 +265,7 @@ class Plots:
                 observable.fake_data,
                 bins=bins,
                 weights=self.weights_fake
-            )
+            )[0]
             rw_std = None
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
@@ -301,7 +301,7 @@ class Plots:
             warnings.simplefilter("ignore", RuntimeWarning)
 
             fig, axs = plt.subplots(
-                2, 1,
+                3, 1,
                 sharex = True,
                 figsize = (6, 4.5),
                 gridspec_kw = {"height_ratios": (4, 1, 1), "hspace": 0.00}
@@ -353,12 +353,12 @@ class Plots:
 
             axs[2].set_ylabel(r"$w$")
 
-            unit = "" if observable.unit is None else f" [{unit}]"
+            unit = "" if observable.unit is None else f" [{observable.unit}]"
             axs[0].set_xlabel(f"${{{observable.tex_label}}}${unit}")
             axs[0].set_xscale(observable.xscale)
             axs[0].set_xlim(bins[0], bins[-1])
 
-            plt.savefig(pdf, format="pdf")
+            plt.savefig(pdf, format="pdf", bbox_inches="tight")
             plt.close()
 
 
