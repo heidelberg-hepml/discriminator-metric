@@ -1,3 +1,9 @@
+# Discriminator Metric for Generative Models
+
+This tool makes it easy to train a classifier to reweight samples from a generative
+model. It comes with an extensive plotting pipeline that allows to inspect the classifier
+output to evaluate the performance of the generative network.
+
 ## Usage
 
 Training a discriminator:
@@ -16,6 +22,8 @@ python -m src --load_model --load_weights 20230303_100000_run_name
 ```
 
 ## Parameters
+
+The following parameters can be set in the YAML parameter file.
 
 ### Data loader
 
