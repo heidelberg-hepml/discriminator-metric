@@ -4,7 +4,18 @@ import torch.nn as nn
 from .vblinear import VBLinear
 
 class Discriminator(nn.Module):
+    """
+    Class that implements a simple fully connected network, optionally as a Bayesian network
+    """
+
     def __init__(self, input_dim: int, params: dict):
+        """
+        Constructs the network using the given parameters.
+
+        Args:
+            input_dim: Dimension of the input data
+            params: Dictionary with the architecture hyperparameters
+        """
         super().__init__()
         self.bayesian_layers = []
 
@@ -44,5 +55,14 @@ class Discriminator(nn.Module):
         self.layers = nn.Sequential(*layers)
 
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Evaluates the network forward pass.
+
+        Args:
+            x: Input tensor
+
+        Returns:
+            Output tensor
+        """
         return self.layers(x)

@@ -10,6 +10,13 @@ from .train import DiscriminatorTraining
 from .plots import Plots
 
 def main():
+    """
+    Main function of the discriminator metric program. The path of a parameter file is
+    expected as a command line argument, or, if the --load_model flag is present, the
+    output folder name of an already trained model. If --load_weights is set, the
+    discriminator weights for the test data are not computed again and the saved weights
+    are used instead.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("paramfile")
     parser.add_argument("--load_model", action="store_true")
@@ -72,9 +79,15 @@ def main():
             print(f"  Classifier score: {clf_score:.7f}")
 
         print("  Creating plots")
-        plots = Plots(data.observables, weights_true, weights_fake, data.label)
+        plots = Plots(
+            data.observables,
+            weights_true,
+            weights_fake,
+            training.losses,
+            data.label
+        )
         print("    Plotting losses")
-        plots.plot_losses(doc.add_file(f"losses_{data.suffix}.pdf"), training.losses)
+        plots.plot_losses(doc.add_file(f"losses_{data.suffix}.pdf"))
         print("    Plotting ROC")
         plots.plot_roc(doc.add_file(f"roc_{data.suffix}.pdf"))
         print("    Plotting weights")

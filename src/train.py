@@ -6,12 +6,25 @@ from .model import Discriminator
 from .dataset import DiscriminatorData
 
 class DiscriminatorTraining:
+    """
+    Class to build, train, evaluate, save and load discriminator models for generative
+    networks.
+    """
+
     def __init__(
         self,
         params: dict,
         device: torch.device,
         data: DiscriminatorData
     ):
+        """
+        Build the network and data loaders.
+
+        Args:
+            params: Dict with architecture and training hyperparameters
+            device: Pytorch device used for training and evaluation
+            data: DiscriminatorData object containing the training and evaluation data
+        """
         self.params = params
         self.device = device
         self.data = data
@@ -42,6 +55,9 @@ class DiscriminatorTraining:
 
 
     def init_data_loaders(self):
+        """
+        Initializes the data loaders using the DiscriminatorData object given to __init__.
+        """
         make_loader = lambda data, mode: torch.utils.data.DataLoader(
             dataset = torch.utils.data.TensorDataset(
                 torch.tensor(data, device=self.device)
@@ -62,6 +78,9 @@ class DiscriminatorTraining:
 
 
     def init_optimizer(self):
+        """
+        Initialized the Adam optimizer.
+        """
         self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             lr = self.params.get("lr", 1e-4),
@@ -72,6 +91,9 @@ class DiscriminatorTraining:
 
 
     def init_scheduler(self):
+        """
+        Initialized the LR scheduler. Currently, one-cycle and step schedulers are supported.
+        """
         self.scheduler_type = self.params.get("lr_scheduler", "one_cycle")
         if self.scheduler_type == "step":
             self.scheduler = torch.optim.lr_scheduler.StepLR(
@@ -91,6 +113,18 @@ class DiscriminatorTraining:
 
 
     def batch_loss(self, x_true, x_fake) -> tuple[torch.Tensor, ...]:
+        """
+        Computes the loss function for a single batch.
+
+        Args:
+            x_true: Discriminator output for truth samples
+            x_fake: Discriminator output for generated samples
+
+        Returns:
+            loss: total loss
+            bce_loss: binary cross entropy loss
+            kl_loss: KL loss term (if network is bayesian, otherwise 0)
+        """
         y_true = self.model(x_true)
         y_fake = self.model(x_fake)
         loss_true = self.loss(y_true, torch.ones_like(y_true))
@@ -107,6 +141,9 @@ class DiscriminatorTraining:
 
 
     def train(self):
+        """
+        Main training loop
+        """
         for epoch in range(self.params["epochs"]):
             self.model.train()
             epoch_losses, epoch_bce_losses, epoch_kl_losses = [], [], []
@@ -138,6 +175,14 @@ class DiscriminatorTraining:
 
 
     def val_loss(self) -> tuple[torch.Tensor, ...]:
+        """
+        Computes the loss for the validation data set
+
+        Returns:
+            loss: total loss
+            bce_loss: binary cross entropy loss
+            kl_loss: KL loss term (if network is bayesian, otherwise 0)
+        """
         self.model.eval()
         with torch.no_grad():
             losses = []
@@ -156,6 +201,16 @@ class DiscriminatorTraining:
 
 
     def predict(self) -> tuple[np.ndarray, ...]:
+        """
+        Computes the classifier weights and loss for the test dataset. If the network is
+        Bayesian, the last dimension of the returned numpy arrays corresponds to the
+        samples from the trainable weights posterior.
+
+        Returns:
+            w_true: Classifier weights for truth samples from the test dataset
+            w_fake: Classifier weights for generated samples from the test dataset
+            clf_score: Classifier score for the test dataset
+        """
         if self.bayesian:
             w_true_all, w_fake_all, clf_score_all = [], [], []
             for i in range(self.params["bayesian_samples"]):
@@ -175,6 +230,14 @@ class DiscriminatorTraining:
 
 
     def predict_single(self):
+        """
+        Computes the classifier weights and loss for the test dataset.
+
+        Returns:
+            w_true: Classifier weights for truth samples from the test dataset
+            w_fake: Classifier weights for generated samples from the test dataset
+            clf_score: Classifier score for the test dataset
+        """
         self.model.eval()
         with torch.no_grad():
             y_true = torch.cat([
@@ -199,6 +262,12 @@ class DiscriminatorTraining:
 
 
     def save(self, file: str):
+        """
+        Saves the model, optimizer and losses.
+
+        Args:
+            file: Output file name
+        """
         torch.save({
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
@@ -207,6 +276,12 @@ class DiscriminatorTraining:
 
 
     def load(self, file: str):
+        """
+        Loads the model, optimizer and losses.
+
+        Args:
+            file: Input file name
+        """
         state_dicts = torch.load(file, map_location=self.device)
         self.optimizer.load_state_dict(state_dicts["optimizer"])
         self.model.load_state_dict(state_dicts["model"])

@@ -14,13 +14,28 @@ Line = namedtuple(
 )
 
 class Plots:
+    """
+    Implements the plotting pipeline to evaluate generative models and the corresponding
+    discriminator weights.
+    """
     def __init__(
         self,
         observables: list[Observable],
         weights_true: np.ndarray,
         weights_fake: np.ndarray,
+        losses: dict,
         title: str
     ):
+        """
+        Initializes the plotting pipeline with the data to be plotted.
+
+        Args:
+            observables: List of observables
+            weights_true: Discriminator weights for truth samples
+            weights_fake: Discriminator weights for generated samples
+            losses: Dictionary with loss terms and learning rate as a function of the epoch
+            title: Title added in all the plots
+        """
         self.observables = observables
         self.bayesian = len(weights_true.shape) == 2
         self.true_mask = np.all(np.isfinite(
@@ -31,6 +46,7 @@ class Plots:
         ), axis=1)
         self.weights_true = weights_true[self.true_mask]
         self.weights_fake = weights_fake[self.fake_mask]
+        self.losses = losses
         self.title = title
 
         plt.rc("font", family="serif", size=16)
@@ -40,31 +56,38 @@ class Plots:
         self.colors = [f"C{i}" for i in range(10)]
 
 
-    def plot_losses(self, file: str, losses: dict):
+    def plot_losses(self, file: str):
+        """
+        Makes plots of the losses (total loss and if bayesian, BCE loss and KL loss
+        separately) and learning rate as a function of the epoch.
+
+        Args:
+            file: Output file name
+        """
         with PdfPages(file) as pdf:
             self.plot_single_loss(
                 pdf,
                 "loss",
-                (losses["train_loss"], losses["val_loss"]),
+                (self.losses["train_loss"], self.losses["val_loss"]),
                 ("train", "val")
             )
             if self.bayesian:
                 self.plot_single_loss(
                     pdf,
                     "BCE loss",
-                    (losses["train_bce_loss"], losses["val_bce_loss"]),
+                    (self.losses["train_bce_loss"], self.losses["val_bce_loss"]),
                     ("train", "val")
                 )
                 self.plot_single_loss(
                     pdf,
                     "KL loss",
-                    (losses["train_kl_loss"], losses["val_kl_loss"]),
+                    (self.losses["train_kl_loss"], self.losses["val_kl_loss"]),
                     ("train", "val")
                 )
             self.plot_single_loss(
                 pdf,
                 "learning rate",
-                (losses["lr"], ),
+                (self.losses["lr"], ),
                 (None, )
             )
 
@@ -76,6 +99,15 @@ class Plots:
         curves: tuple[np.ndarray],
         labels: tuple[str]
     ):
+        """
+        Makes single loss plot.
+
+        Args:
+            pdf: Multipage PDF object
+            ylabel: Y axis label
+            curves: List of numpy arrays with the loss curves to be plotted
+            labels: Labels of the loss curves
+        """
         fig, ax = plt.subplots(figsize=(4,3.5))
         for i, (curve, label) in enumerate(zip(curves, labels)):
             epochs = np.arange(1, len(curve)+1)
@@ -97,6 +129,13 @@ class Plots:
 
 
     def plot_roc(self, file: str):
+        """
+        Plots the ROC curve and computes the AUC. For a Bayesian network, one curve is plotted
+        for each sample from the distribution over the trainable weights.
+
+        Args:
+            file: Output file name
+        """
         scores = np.concatenate((self.weights_true, self.weights_fake), axis=0)
         labels = np.concatenate((
             np.ones_like(self.weights_true),
@@ -146,6 +185,13 @@ class Plots:
 
 
     def plot_weight_hist(self, file: str):
+        """
+        Plots the weight histograms of the generated, truth and combined test data. Multiple
+        histograms with different axis limits and scales are made.
+
+        Args:
+            file: Output file name
+        """
         with PdfPages(file) as pdf:
             clean_array = lambda a: a[np.isfinite(a)]
             wmin = min(
@@ -180,6 +226,15 @@ class Plots:
         xscale: str,
         yscale: str
     ):
+        """
+        Plots a single weight histogram.
+
+        Args:
+            pdf: Multipage PDF object
+            bins: Numpy array with the bin boundaries
+            xscale: X axis scale, "linear" or "log"
+            yscale: Y axis scale, "linear" or "log"
+        """
         weights_combined = np.concatenate((self.weights_true, self.weights_fake), axis=0)
         if self.bayesian:
             true_hists = np.stack([
@@ -259,6 +314,14 @@ class Plots:
 
 
     def plot_weight_pulls(self, file: str):
+        """
+        Plots histograms of the weight pulls extracted from the Bayesian network,
+        defined as (mu - 1) / sigma, where mu and sigma are mean and standard
+        deviation from sampling over the trainable weight posterior.
+
+        Args:
+            file: Output file name
+        """
         assert self.bayesian
         bins = np.linspace(-5, 5, 50)
 
@@ -324,12 +387,27 @@ class Plots:
 
 
     def plot_observables(self, file: str):
+        """
+        Plots histograms of all the given observables. The truth, generated and reweighted
+        distributions are shown. The ratio of the latter two to the truth is shown in a
+        second panel. The third panel shows the marginalized discriminator weight.
+
+        Args:
+            file: Output file name
+        """
         with PdfPages(file) as pdf:
             for observable in self.observables:
                 self.plot_single_observable(pdf, observable)
 
 
     def plot_single_observable(self, pdf: PdfPages, observable: Observable):
+        """
+        Plots the histograms for a single observable
+
+        Args:
+            pdf: Multipage PDF object
+            observable: Observable to be plotted
+        """
         bins = observable.bins
         if self.bayesian:
             rw_hists = np.stack([
@@ -382,6 +460,16 @@ class Plots:
         lower_thresholds: list[float],
         upper_thresholds: list[float]
     ):
+        """
+        Plots the clustering histograms for all observables. A subset of samples is selected
+        by imposing thresholds for the weights. Then, the histograms of these subsets are
+        plotted.
+
+        Args:
+            file: Output file name
+            lower_thresholds: List of lower thresholds for the weights
+            upper_thresholds: List of upper thresholds for the weights
+        """
         with PdfPages(file) as pdf:
             for observable in self.observables:
                 self.plot_single_clustering(
@@ -399,6 +487,15 @@ class Plots:
         lower_thresholds: list[float],
         upper_thresholds: list[float]
     ):
+        """
+        Plots the clustering histograms for a single observable
+
+        Args:
+            pdf: Multipage PDF object
+            observable: Observable to be plotted
+            lower_thresholds: List of lower thresholds for the weights
+            upper_thresholds: List of upper thresholds for the weights
+        """
         bins = observable.bins
         if self.bayesian:
             weights_fake = np.mean(self.weights_fake, axis=1)
@@ -436,6 +533,17 @@ class Plots:
         show_ratios: bool = True,
         show_weights: bool = True
     ):
+        """
+        Makes a single histogram plot, used for the observable histograms and clustering
+        histograms.
+
+        Args:
+            pdf: Multipage PDF object
+            lines: List of line objects describing the histograms
+            bins: Numpy array with the bin boundaries
+            show_ratios: If True, show a panel with ratios
+            show_weights: If True, show a panel with marginalized weights
+        """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
 
@@ -515,6 +623,18 @@ class Plots:
         label: str,
         color: str
     ):
+        """
+        Plot a stepped line for a histogram, optionally with error bars.
+
+        Args:
+            ax: Matplotlib Axes
+            bins: Numpy array with bin boundaries
+            y: Y values for the bins
+            y_err: Y errors for the bins
+            label: Label of the line
+            color: Color of the line
+        """
+
         dup_last = lambda a: np.append(a, a[-1])
 
         ax.step(
