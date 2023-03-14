@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 from .model import Discriminator
 from .dataset import DiscriminatorData
@@ -17,6 +18,7 @@ class DiscriminatorTraining:
 
         self.init_data_loaders()
         self.model = Discriminator(data.dim, params)
+        self.model.to(self.device)
         self.init_optimizer()
         self.init_scheduler()
         self.loss = nn.BCEWithLogitsLoss()
@@ -40,8 +42,10 @@ class DiscriminatorTraining:
 
 
     def init_data_loaders(self):
-        make_loader = lambda dataset, mode: torch.utils.data.DataLoader(
-            dataset = dataset,
+        make_loader = lambda data, mode: torch.utils.data.DataLoader(
+            dataset = torch.utils.data.TensorDataset(
+                torch.tensor(data, device=self.device)
+            ),
             batch_size = self.params["batch_size"],
             shuffle = mode == "train",
             drop_last = mode in ["train", "val"]
@@ -121,14 +125,14 @@ class DiscriminatorTraining:
 
             val_loss, val_bce_loss, val_kl_loss = self.val_loss()
             train_loss = torch.stack(epoch_losses).mean()
-            self.losses["train_loss"].append(train_loss)
-            self.losses["val_loss"].append(val_loss)
+            self.losses["train_loss"].append(train_loss.item())
+            self.losses["val_loss"].append(val_loss.item())
             self.losses["lr"].append(self.optimizer.param_groups[0]["lr"])
             if self.bayesian:
-                self.losses["train_bce_loss"].append(torch.stack(epoch_bce_losses).mean())
-                self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean())
-                self.losses["val_bce_loss"].append(val_bce_loss)
-                self.losses["val_kl_loss"].append(val_kl_loss)
+                self.losses["train_bce_loss"].append(torch.stack(epoch_bce_losses).mean().item())
+                self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean().item())
+                self.losses["val_bce_loss"].append(val_bce_loss.item())
+                self.losses["val_kl_loss"].append(val_kl_loss.item())
             print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
                   f"val loss {val_loss:.6f}")
 
@@ -152,6 +156,20 @@ class DiscriminatorTraining:
 
 
     def predict(self):
+        if self.bayesian:
+            w_true_all, w_fake_all = [], []
+            for i in range(self.params["bayesian_samples"]):
+                for layer in self.model.bayesian_layers:
+                    layer.reset_random()
+                w_true, w_fake = self.predict_single()
+                w_true_all.append(w_true)
+                w_fake_all.append(w_fake)
+            return np.stack(w_true_all, axis=1), np.stack(w_fake_all, axis=1)
+        else:
+            return self.predict_single()
+
+
+    def predict_single(self):
         self.model.eval()
         with torch.no_grad():
             y_true = torch.cat([
@@ -163,7 +181,7 @@ class DiscriminatorTraining:
                 for (x_fake, ) in self.test_loader_fake
             ])
             w_true = (1 - y_true) / y_true
-            w_fake = y_fake / torch.clip(1 - y_fake, min=1e-7)
+            w_fake = y_fake / (1 - y_fake)
             return w_true.cpu().numpy(), w_fake.cpu().numpy()
 
 

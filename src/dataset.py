@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from torch.utils.data import Dataset
+import numpy as np
 
 from .observable import Observable
 
@@ -8,10 +8,10 @@ class DiscriminatorData:
     label: str
     suffix: str
     dim: int
-    train_true: Dataset
-    train_fake: Dataset
-    test_true: Dataset
-    test_fake: Dataset
-    val_true: Dataset
-    val_fake: Dataset
+    train_true: np.ndarray
+    train_fake: np.ndarray
+    test_true: np.ndarray
+    test_fake: np.ndarray
+    val_true: np.ndarray
+    val_fake: np.ndarray
     observables: list[Observable]

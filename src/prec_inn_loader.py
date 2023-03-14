@@ -1,5 +1,4 @@
 import pandas as pd
-import torch
 import numpy as np
 from types import SimpleNamespace
 
@@ -44,7 +43,7 @@ def load(params: dict) -> list[DiscriminatorData]:
         datasets.append(DiscriminatorData(
             label = subset["label"],
             suffix = subset["suffix"],
-            dim = pp_train_true.tensors[0].shape[1],
+            dim = pp_train_true.shape[1],
             train_true = pp_train_true,
             train_fake = compute_preprocessing(train_fake, **preproc_kwargs),
             test_true = compute_preprocessing(test_true, **preproc_kwargs),
@@ -75,7 +74,7 @@ def compute_preprocessing(
     include_momenta: bool,
     append_mass: bool,
     append_delta_r: bool
-) -> torch.utils.data.Dataset:
+) -> np.ndarray:
     mult = data.shape[1]
     obs = observables_one_particle(data)
     dphi = lambda phi1, phi2: (phi1 - phi2 + np.pi) % (2*np.pi) - np.pi
@@ -112,9 +111,7 @@ def compute_preprocessing(
         norm["means"] = np.mean(data_preproc, axis=0)
     if "stds" not in norm:
         norm["stds"] = np.std(data_preproc, axis=0)
-    return torch.utils.data.TensorDataset(torch.tensor(
-        (data_preproc - norm["means"]) / norm["stds"]
-    ))
+    return (data_preproc - norm["means"]) / norm["stds"]
 
 
 def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Observable]:

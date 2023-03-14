@@ -9,14 +9,14 @@ class Discriminator(nn.Module):
         self.bayesian_layers = []
 
         if params["bayesian"]:
-            layer_class = nn.Linear
-            layer_kwargs = {}
-        else:
             layer_class = VBLinear
             layer_kwargs = {
                 "prior_prec": params.get("prior_prec", 1.0),
                 "std_init": params.get("std_init", -9)
             }
+        else:
+            layer_class = nn.Linear
+            layer_kwargs = {}
 
         activation = {
             "relu": nn.ReLU,

@@ -16,9 +16,15 @@ class Plots:
         title: str
     ):
         self.observables = observables
-        self.weights_true = weights_true
-        self.weights_fake = weights_fake
-        self.bayesian = len(self.weights_true.shape) == 2
+        self.bayesian = len(weights_true.shape) == 2
+        self.true_mask = np.all(np.isfinite(
+            weights_true if self.bayesian else weights_true[:,None]
+        ), axis=1)
+        self.fake_mask = np.all(np.isfinite(
+            weights_fake if self.bayesian else weights_fake[:,None]
+        ), axis=1)
+        self.weights_true = weights_true[self.true_mask]
+        self.weights_fake = weights_fake[self.fake_mask]
         self.title = title
 
         plt.rc("font", family="serif", size=16)
@@ -68,7 +74,6 @@ class Plots:
         for i, (curve, label) in enumerate(zip(curves, labels)):
             epochs = np.arange(1, len(curve)+1)
             ax.plot(epochs, curve, label=label)
-        ax.legend(frameon=False)
         ax.set_xlabel("epoch")
         ax.set_ylabel(ylabel)
         ax.text(
@@ -79,6 +84,8 @@ class Plots:
             verticalalignment = "top",
             transform = ax.transAxes
         )
+        if any(label is not None for label in labels):
+            ax.legend(loc="center right", frameon=False)
         plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 
@@ -114,7 +121,8 @@ class Plots:
         ax.text(
             x = 0.05,
             y = 0.95,
-            s = f"AUC = {auc:.2f}",
+            s = f"AUC = ${np.mean(auc):.3f} \\pm {np.std(auc):.3f}$"
+                if self.bayesian else f"AUC = {auc:.3f}",
             horizontalalignment = "left",
             verticalalignment = "top",
             transform = ax.transAxes
@@ -134,7 +142,10 @@ class Plots:
     def plot_weight_hist(self, file: str):
         with PdfPages(file) as pdf:
             clean_array = lambda a: a[np.isfinite(a)]
-            wmin = min(np.min(self.weights_true), np.min(self.weights_fake))
+            wmin = min(
+                np.min(self.weights_true[self.weights_true != 0]),
+                np.min(self.weights_fake[self.weights_fake != 0])
+            ) 
             wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
             self.plot_single_weight_hist(
                 pdf,
@@ -185,11 +196,11 @@ class Plots:
             ], axis=1)
 
             y_true = np.mean(true_hists, axis=1)
-            y_err_true = np.std(true_hists, axis=1)
+            y_true_err = np.std(true_hists, axis=1)
             y_fake = np.mean(fake_hists, axis=1)
-            y_err_fake = np.std(fake_hists, axis=1)
+            y_fake_err = np.std(fake_hists, axis=1)
             y_combined = np.mean(combined_hists, axis=1)
-            y_err_combined = np.std(combined_hists, axis=1)
+            y_combined_err = np.std(combined_hists, axis=1)
 
         else:
             y_true = np.histogram(self.weights_true, bins=bins)[0]
@@ -253,7 +264,7 @@ class Plots:
         if self.bayesian:
             rw_hists = np.stack([
                 np.histogram(
-                    observable.fake_data,
+                    observable.fake_data[self.fake_mask],
                     bins = bins,
                     weights = self.weights_fake[:,i],
                     density = True
@@ -263,7 +274,7 @@ class Plots:
             rw_std = np.std(rw_hists, axis=1)
         else:
             rw_mean = np.histogram(
-                observable.fake_data,
+                observable.fake_data[self.fake_mask],
                 bins=bins,
                 weights=self.weights_fake
             )[0]

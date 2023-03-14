@@ -2,6 +2,7 @@ import yaml
 import argparse
 from importlib import import_module
 import torch
+import pickle
 
 from .documenter import Documenter
 from .train import DiscriminatorTraining
@@ -10,10 +11,11 @@ from .plots import Plots
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("paramfile")
-    parser.add_argument("--load", action="store_true")
+    parser.add_argument("--load_model", action="store_true")
+    parser.add_argument("--load_weights", action="store_true")
     args = parser.parse_args()
 
-    if args.load:
+    if args.load_model:
         doc, params = Documenter.from_saved_run(args.paramfile)
     else:
         doc, params = Documenter.from_param_file(args.paramfile)
@@ -36,18 +38,32 @@ def main():
         print("  Building model")
         training = DiscriminatorTraining(params, device, data)
 
-        if args.load:
+        if args.load_model:
             print("  Loading model")
             training.load(doc.get_file(f"model_{data.suffix}.pth"))
 
-        if not args.load:
+        if not args.load_model:
             print("  Running training")
             training.train()
             print("  Saving model")
             training.save(doc.get_file(f"model_{data.suffix}.pth"))
 
-        print("  Calculating weights")
-        weights_true, weights_fake = training.predict()
+        
+        if args.load_model and args.load_weights:
+            print("  Loading weights")
+            with open(doc.get_file(f"weights_{data.suffix}.pkl"), "rb") as f:
+                saved_weights = pickle.load(f)
+            weights_true = saved_weights["true"]
+            weights_fake = saved_weights["fake"]
+        else:
+            print("  Calculating weights")
+            weights_true, weights_fake = training.predict()
+            print("  Saving weights")
+            with open(doc.get_file(f"weights_{data.suffix}.pkl"), "wb") as f:
+                pickle.dump({
+                    "true": weights_true,
+                    "fake": weights_fake
+                }, f)
 
         print("  Creating plots")
         plots = Plots(data.observables, weights_true, weights_fake, data.label)
