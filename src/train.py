@@ -90,7 +90,7 @@ class DiscriminatorTraining:
             raise ValueError(f"Unknown LR scheduler '{self.scheduler_type}'")
 
 
-    def batch_loss(self, x_true, x_fake):
+    def batch_loss(self, x_true, x_fake) -> tuple[torch.Tensor, ...]:
         y_true = self.model(x_true)
         y_fake = self.model(x_fake)
         loss_true = self.loss(y_true, torch.ones_like(y_true))
@@ -110,7 +110,7 @@ class DiscriminatorTraining:
         for epoch in range(self.params["epochs"]):
             self.model.train()
             epoch_losses, epoch_bce_losses, epoch_kl_losses = [], [], []
-            for i,((x_true, ), (x_fake, )) in enumerate(zip(self.train_loader_true, self.train_loader_fake)):
+            for (x_true, ), (x_fake, ) in zip(self.train_loader_true, self.train_loader_fake):
                 self.optimizer.zero_grad()
                 loss, bce_loss, kl_loss = self.batch_loss(x_true, x_fake)
                 epoch_losses.append(loss.detach())
@@ -137,7 +137,7 @@ class DiscriminatorTraining:
                   f"val loss {val_loss:.6f}")
 
 
-    def val_loss(self):
+    def val_loss(self) -> tuple[torch.Tensor, ...]:
         self.model.eval()
         with torch.no_grad():
             losses = []
@@ -155,16 +155,21 @@ class DiscriminatorTraining:
             )
 
 
-    def predict(self):
+    def predict(self) -> tuple[np.ndarray, ...]:
         if self.bayesian:
-            w_true_all, w_fake_all = [], []
+            w_true_all, w_fake_all, clf_score_all = [], [], []
             for i in range(self.params["bayesian_samples"]):
                 for layer in self.model.bayesian_layers:
                     layer.reset_random()
-                w_true, w_fake = self.predict_single()
+                w_true, w_fake, clf_score = self.predict_single()
                 w_true_all.append(w_true)
                 w_fake_all.append(w_fake)
-            return np.stack(w_true_all, axis=1), np.stack(w_fake_all, axis=1)
+                clf_score_all.append(clf_score)
+            return (
+                np.stack(w_true_all, axis=1),
+                np.stack(w_fake_all, axis=1),
+                np.stack(clf_score_all, axis=0)
+            )
         else:
             return self.predict_single()
 
@@ -173,16 +178,24 @@ class DiscriminatorTraining:
         self.model.eval()
         with torch.no_grad():
             y_true = torch.cat([
-                self.model(x_true).sigmoid().flatten()
-                for (x_true, ) in self.test_loader_true
+                self.model(x_true) for (x_true, ) in self.test_loader_true
             ])
             y_fake = torch.cat([
-                self.model(x_fake).sigmoid().flatten()
-                for (x_fake, ) in self.test_loader_fake
+                self.model(x_fake) for (x_fake, ) in self.test_loader_fake
             ])
-            w_true = (1 - y_true) / y_true
-            w_fake = y_fake / (1 - y_fake)
-            return w_true.cpu().numpy(), w_fake.cpu().numpy()
+            y_true_sig = y_true.sigmoid().flatten()
+            y_fake_sig = y_fake.sigmoid().flatten()
+            w_true = (1 - y_true_sig) / y_true_sig
+            w_fake = y_fake_sig / (1 - y_fake_sig)
+            min_size = min(len(y_true), len(y_fake))
+            clf_score = self.loss(
+                torch.cat((y_true[:min_size], y_fake[:min_size])),
+                torch.cat((
+                    torch.ones_like(y_true[:min_size]),
+                    torch.zeros_like(y_true[:min_size])
+                ))
+            )
+            return w_true.cpu().numpy(), w_fake.cpu().numpy(), clf_score.cpu().numpy()
 
 
     def save(self, file: str):

@@ -7,6 +7,12 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from .observable import Observable
 
+Line = namedtuple(
+    "Line",
+    ["y", "y_err", "y_ref", "y_orig", "label", "color"],
+    defaults = [None, None, None, None, None]
+)
+
 class Plots:
     def __init__(
         self,
@@ -145,7 +151,7 @@ class Plots:
             wmin = min(
                 np.min(self.weights_true[self.weights_true != 0]),
                 np.min(self.weights_fake[self.weights_fake != 0])
-            ) 
+            )
             wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
             self.plot_single_weight_hist(
                 pdf,
@@ -214,24 +220,24 @@ class Plots:
         self.hist_line(
             ax,
             bins,
-            y_combined,
-            y_combined_err,
+            y_combined / np.sum(y_combined),
+            y_combined_err / np.sum(y_combined),
             label = "Comb",
             color = self.colors[0]
         )
         self.hist_line(
             ax,
             bins,
-            y_true,
-            y_true_err,
+            y_true / np.sum(y_true),
+            y_true_err / np.sum(y_true),
             label = "Truth",
             color = self.colors[1]
         )
         self.hist_line(
             ax,
             bins,
-            y_fake,
-            y_fake_err,
+            y_fake / np.sum(y_fake),
+            y_fake_err / np.sum(y_fake),
             label = "Gen",
             color = self.colors[2]
         )
@@ -252,6 +258,71 @@ class Plots:
         plt.close()
 
 
+    def plot_weight_pulls(self, file: str):
+        assert self.bayesian
+        bins = np.linspace(-5, 5, 50)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+
+            w_normed_true = self.weights_true / np.mean(self.weights_true)
+            mu_true = np.mean(w_normed_true, axis=1)
+            sigma_true = np.std(w_normed_true, axis=1)
+            pull_true = (mu_true - 1.) / sigma_true
+
+            w_normed_fake = self.weights_fake / np.mean(self.weights_fake)
+            mu_fake = np.mean(w_normed_fake, axis=1)
+            sigma_fake = np.std(w_normed_fake, axis=1)
+            pull_fake = (mu_fake - 1.) / sigma_fake
+
+            pull_combined = np.concatenate((pull_true, pull_fake))
+            y_combined, _ = np.histogram(pull_combined, bins=bins, density=True)
+            y_true, _ = np.histogram(pull_true, bins=bins, density=True)
+            y_fake, _ = np.histogram(pull_fake, bins=bins, density=True)
+
+        fig, ax = plt.subplots(figsize=(4, 3.5))
+        self.hist_line(
+            ax,
+            bins,
+            y_combined,
+            y_err = None,
+            label = "Comb",
+            color = self.colors[0]
+        )
+        self.hist_line(
+            ax,
+            bins,
+            y_true,
+            y_err = None,
+            label = "Truth",
+            color = self.colors[1]
+        )
+        self.hist_line(
+            ax,
+            bins,
+            y_fake,
+            y_err = None,
+            label = "Gen",
+            color = self.colors[2]
+        )
+        ax.text(
+            x = 0.95,
+            y = 0.95,
+            s = self.title,
+            horizontalalignment = "right",
+            verticalalignment = "top",
+            transform = ax.transAxes
+        )
+
+        ax.set_xlabel(r"$(\mu - 1) / \sigma$")
+        ax.set_ylabel("normalized")
+        ax.set_yscale("log")
+        ax.set_xlim(bins[0], bins[-1])
+
+        plt.savefig(file, bbox_inches="tight")
+        plt.close()
+
+
     def plot_observables(self, file: str):
         with PdfPages(file) as pdf:
             for observable in self.observables:
@@ -260,7 +331,6 @@ class Plots:
 
     def plot_single_observable(self, pdf: PdfPages, observable: Observable):
         bins = observable.bins
-
         if self.bayesian:
             rw_hists = np.stack([
                 np.histogram(
@@ -282,11 +352,6 @@ class Plots:
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
 
-        Line = namedtuple(
-            "Line",
-            ["y", "y_err", "y_ref", "y_orig", "label", "color"],
-            defaults = [None, None, None, None, None]
-        )
         lines = [
             Line(
                 y = true_hist,
@@ -308,16 +373,81 @@ class Plots:
                 color = self.colors[2],
             ),
         ]
+        self.hist_plot(pdf, lines, bins, observable)
 
+
+    def plot_clustering(
+        self,
+        file: str,
+        lower_thresholds: list[float],
+        upper_thresholds: list[float]
+    ):
+        with PdfPages(file) as pdf:
+            for observable in self.observables:
+                self.plot_single_clustering(
+                    pdf,
+                    observable,
+                    lower_thresholds,
+                    upper_thresholds
+                )
+
+
+    def plot_single_clustering(
+        self,
+        pdf: PdfPages,
+        observable: Observable,
+        lower_thresholds: list[float],
+        upper_thresholds: list[float]
+    ):
+        bins = observable.bins
+        if self.bayesian:
+            weights_fake = np.mean(self.weights_fake, axis=1)
+        else:
+            weights_fake = self.weights_fake
+
+        masks, labels = [], []
+        for threshold in lower_thresholds:
+            masks.append(weights_fake < threshold)
+            labels.append(f"$w < {threshold}$")
+        for threshold in upper_thresholds:
+            masks.append(weights_fake > threshold)
+            labels.append(f"$w > {threshold}$")
+        hists = [
+            np.histogram(
+                observable.fake_data[self.fake_mask][mask],
+                bins=bins,
+                density=True
+            )[0]
+            for mask in masks
+        ]
+        lines = [
+            Line(y=hist, label=label, color=color)
+            for hist, label, color in zip(hists, labels, self.colors)
+        ]
+        self.hist_plot(pdf, lines, bins, observable, show_ratios=False, show_weights=False)
+
+
+    def hist_plot(
+        self,
+        pdf: PdfPages,
+        lines: list[Line],
+        bins: np.ndarray,
+        observable: Observable,
+        show_ratios: bool = True,
+        show_weights: bool = True
+    ):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
 
+            n_panels = 1 + int(show_ratios) + int(show_weights)
             fig, axs = plt.subplots(
-                3, 1,
+                n_panels, 1,
                 sharex = True,
                 figsize = (6, 4.5),
-                gridspec_kw = {"height_ratios": (4, 1, 1), "hspace": 0.00}
+                gridspec_kw = {"height_ratios": (4, 1, 1)[:n_panels], "hspace": 0.00}
             )
+            if n_panels == 1:
+                axs = [axs]
 
             for line in lines:
                 integral = np.sum((bins[1:] - bins[:-1]) * line.y)
@@ -356,42 +486,24 @@ class Plots:
             axs[0].set_ylabel("normalized")
             axs[0].set_yscale(observable.yscale)
 
-            axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
-            axs[1].set_yticks([0.8,1,1.2])
-            axs[1].set_ylim([0.75,1.25])
-            axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
-            axs[1].axhline(y=1.2, c="black", ls="dotted", lw=0.5)
-            axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
+            if show_ratios:
+                axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
+                axs[1].set_yticks([0.8,1,1.2])
+                axs[1].set_ylim([0.75,1.25])
+                axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
+                axs[1].axhline(y=1.2, c="black", ls="dotted", lw=0.5)
+                axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
 
-            axs[2].set_ylabel(r"$w$")
+            if show_weights:
+                axs[1+int(show_ratios)].set_ylabel(r"$w$")
+
             unit = "" if observable.unit is None else f" [{observable.unit}]"
-            axs[2].set_xlabel(f"${{{observable.tex_label}}}${unit}")
-            axs[2].set_xscale(observable.xscale)
-            axs[2].set_xlim(bins[0], bins[-1])
+            axs[-1].set_xlabel(f"${{{observable.tex_label}}}${unit}")
+            axs[-1].set_xscale(observable.xscale)
+            axs[-1].set_xlim(bins[0], bins[-1])
 
             plt.savefig(pdf, format="pdf", bbox_inches="tight")
             plt.close()
-
-
-    def plot_clustering(
-        self,
-        file: str,
-        low_cutoffs: list[float],
-        high_cutoffs: list[float]
-    ):
-        with PdfPages(file) as pdf:
-            for observable in self.observables:
-                self.plot_single_clustering(pdf, observable, low_cutoffs, high_cutoffs)
-
-
-    def plot_single_clustering(
-        self,
-        pdf: PdfPages,
-        observable: Observable,
-        low_cutoffs: list[float],
-        high_cutoffs: list[float]
-    ):
-        pass
 
 
     def hist_line(
