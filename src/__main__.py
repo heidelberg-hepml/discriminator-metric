@@ -26,7 +26,7 @@ def main():
     device = torch.device("cuda:0" if use_cuda else "cpu")
 
     print("Loading data")
-    loader = import_module(params["loader_module"], "src")
+    loader = import_module(f"src.loaders.{params['loader_module']}")
     datasets = loader.load(params["loader_params"])
 
     for data in datasets:

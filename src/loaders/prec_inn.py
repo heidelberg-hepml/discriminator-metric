@@ -2,8 +2,8 @@ import pandas as pd
 import numpy as np
 from types import SimpleNamespace
 
-from .dataset import DiscriminatorData
-from .observable import Observable
+from ..dataset import DiscriminatorData
+from ..observable import Observable
 
 def load(params: dict) -> list[DiscriminatorData]:
     true_momenta = pd.read_hdf(params["truth_file"]).to_numpy().reshape(-1, 5, 4)
