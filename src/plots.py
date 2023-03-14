@@ -133,6 +133,7 @@ class Plots:
 
     def plot_weight_hist(self, file: str):
         with PdfPages(file) as pdf:
+            clean_array = lambda a: a[np.isfinite(a)]
             wmin = min(np.min(self.weights_true), np.min(self.weights_fake))
             wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
             self.plot_single_weight_hist(
@@ -352,11 +353,10 @@ class Plots:
             axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
 
             axs[2].set_ylabel(r"$w$")
-
             unit = "" if observable.unit is None else f" [{observable.unit}]"
-            axs[0].set_xlabel(f"${{{observable.tex_label}}}${unit}")
-            axs[0].set_xscale(observable.xscale)
-            axs[0].set_xlim(bins[0], bins[-1])
+            axs[2].set_xlabel(f"${{{observable.tex_label}}}${unit}")
+            axs[2].set_xscale(observable.xscale)
+            axs[2].set_xlim(bins[0], bins[-1])
 
             plt.savefig(pdf, format="pdf", bbox_inches="tight")
             plt.close()

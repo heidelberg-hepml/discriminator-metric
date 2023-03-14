@@ -163,7 +163,7 @@ class DiscriminatorTraining:
                 for (x_fake, ) in self.test_loader_fake
             ])
             w_true = (1 - y_true) / y_true
-            w_fake = y_fake / (1 - y_fake)
+            w_fake = y_fake / torch.clip(1 - y_fake, min=1e-7)
             return w_true.cpu().numpy(), w_fake.cpu().numpy()
 
 
@@ -179,4 +179,4 @@ class DiscriminatorTraining:
         state_dicts = torch.load(file, map_location=self.device)
         self.optimizer.load_state_dict(state_dicts["optimizer"])
         self.model.load_state_dict(state_dicts["model"])
-        self.losses = state_dicts["model"]
+        self.losses = state_dicts["losses"]

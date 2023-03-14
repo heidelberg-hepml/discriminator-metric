@@ -36,6 +36,7 @@ def load(params: dict) -> list[DiscriminatorData]:
         )
         preproc_kwargs = {
             "norm": {},
+            "include_momenta": params.get("include_momenta", True),
             "append_mass": params.get("append_mass", False),
             "append_delta_r": params.get("append_delta_r", False)
         }
@@ -71,6 +72,7 @@ def split_data(
 def compute_preprocessing(
     data: np.ndarray,
     norm: dict,
+    include_momenta: bool,
     append_mass: bool,
     append_delta_r: bool
 ) -> torch.utils.data.Dataset:
@@ -79,14 +81,16 @@ def compute_preprocessing(
     dphi = lambda phi1, phi2: (phi1 - phi2 + np.pi) % (2*np.pi) - np.pi
     dr = lambda phi1, phi2, eta1, eta2: np.sqrt(dphi(phi1, phi2)**2 + (eta1 - eta2)**2)
 
-    input_obs = [
-        obs.pt[:,0], obs.eta[:,0],
-        obs.pt[:,1], obs.eta[:,1], dphi(obs.phi[:,0], obs.phi[:,1]),
-    ]
-    for i in range(2, mult):
+    input_obs = []
+    if include_momenta:
         input_obs.extend([
-            obs.pt[:,i], obs.eta[:,i], dphi(obs.phi[:,i-1], obs.phi[:,i]), obs.m[:,i]
+            obs.pt[:,0], obs.eta[:,0],
+            obs.pt[:,1], obs.eta[:,1], dphi(obs.phi[:,0], obs.phi[:,1]),
         ])
+        for i in range(2, mult):
+            input_obs.extend([
+                obs.pt[:,i], obs.eta[:,i], dphi(obs.phi[:,i-1], obs.phi[:,i]), obs.m[:,i]
+            ])
 
     if append_mass:
         p_mumu = data[:,0] + data[:,1]
@@ -95,6 +99,7 @@ def compute_preprocessing(
             0.
         ))
         input_obs.append(mass)
+
     if append_delta_r:
         if mult > 3:
             input_obs.append(dr(obs.phi[:,2], obs.phi[:,3], obs.eta[:,2], obs.eta[:,3]))
@@ -123,14 +128,75 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
     obs_two_fake = {
         (i,j): observables_two_particles(obs_one_fake[i], obs_one_fake[j]) for i,j in pairs
     }
-    return [Observable(
-        true_data = obs_one_true[i].pt,
-        fake_data = obs_one_fake[i].pt,
-        tex_label = f"p_{{T,{i}}}",
-        bins = np.linspace(np.min(obs_one_true[i].pt), np.quantile(obs_one_true[i].pt, 0.99)),
-        yscale = "log",
-        unit = "GeV"
-    ) for i in range(mult)]
+    observables = []
+    for i in range(mult):
+        observables.extend([
+            Observable(
+                true_data = obs_one_true[i].pt,
+                fake_data = obs_one_fake[i].pt,
+                tex_label = f"p_{{T,{i}}}",
+                bins = np.linspace(
+                    np.min(obs_one_true[i].pt),
+                    np.quantile(obs_one_true[i].pt, 0.99),
+                    50
+                ),
+                yscale = "log",
+                unit = "GeV"
+            ),
+            Observable(
+                true_data = obs_one_true[i].eta,
+                fake_data = obs_one_fake[i].eta,
+                tex_label = f"\\eta_{i}",
+                bins = np.linspace(-6, 6, 50),
+            )
+        ])
+        if i >= 2:
+            observables.append(Observable(
+                true_data = obs_one_true[i].m,
+                fake_data = obs_one_fake[i].m,
+                tex_label = f"M_{i}",
+                bins = np.linspace(
+                    np.quantile(obs_one_true[i].m, 0.005),
+                    np.quantile(obs_one_true[i].m, 0.995),
+                    50
+                ),
+                unit = "GeV"
+            ))
+        observables.append(Observable(
+            true_data = obs_two_true[(0,1)].m,
+            fake_data = obs_two_fake[(0,1)].m,
+            tex_label = r"M_{\mu\mu}",
+            bins = np.linspace(
+                np.quantile(obs_two_true[(0,1)].m, 0.005),
+                np.quantile(obs_two_true[(0,1)].m, 0.995),
+                50
+            ),
+            unit = "GeV"
+        ))
+    for i, j in [(2,3), (2,4), (3,4)]:
+        if i > mult-1 or j > mult-1:
+            continue
+        observables.extend([
+            Observable(
+                true_data = obs_two_true[(i,j)].delta_r,
+                fake_data = obs_two_fake[(i,j)].delta_r,
+                tex_label = f"\\Delta R_{{{i},{j}}}",
+                bins = np.linspace(0, 12, 50),
+            ),
+            Observable(
+                true_data = obs_two_true[(i,j)].delta_eta,
+                fake_data = obs_two_fake[(i,j)].delta_eta,
+                tex_label = f"\\Delta \\eta_{{{i},{j}}}",
+                bins = np.linspace(-10, 10, 50),
+            ),
+            Observable(
+                true_data = obs_two_true[(i,j)].delta_phi,
+                fake_data = obs_two_fake[(i,j)].delta_phi,
+                tex_label = f"\\Delta \\phi_{{{i},{j}}}",
+                bins = np.linspace(-np.pi, np.pi, 50),
+            )
+        ])
+    return observables
 
 
 def observables_one_particle(momenta: np.ndarray) -> SimpleNamespace:
@@ -153,4 +219,6 @@ def observables_two_particles(obs1: SimpleNamespace, obs2: SimpleNamespace) -> S
     r.delta_phi = (obs1.phi - obs2.phi + np.pi) % (2*np.pi) - np.pi
     r.delta_eta = obs1.eta - obs2.eta
     r.delta_r = np.sqrt(r.delta_phi**2 + r.delta_eta**2)
+    r.m = np.sqrt(np.maximum((obs1.e+obs2.e)**2 - (obs1.px+obs2.px)**2 -
+                             (obs1.py+obs2.py)**2 - (obs1.pz+obs2.pz)**2, 0))
     return r

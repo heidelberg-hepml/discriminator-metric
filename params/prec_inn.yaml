@@ -1,0 +1,28 @@
+run_name: test
+
+# Dataset
+loader_module: .prec_inn_loader
+loader_params:
+  truth_file: data/truth.h5
+  generated_file: data/generated.h5
+  append_mass: True
+  append_delta_r: True
+  train_split: 0.45
+  test_split: 0.5
+
+# Model
+activation: relu
+dropout: 0.0
+layers: 8
+hidden_size: 256
+
+# Training
+bayesian: False
+lr: 1.e-4
+betas: [0.9, 0.99]
+weight_decay: 0.0
+epochs: 1
+batch_size: 1024
+lr_scheduler: one_cycle
+max_lr: 1.e-3
+
