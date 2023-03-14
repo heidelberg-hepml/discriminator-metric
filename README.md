@@ -19,43 +19,43 @@ python -m src --load_model --load_weights 20230303_100000_run_name
 
 ### Data loader
 
-Parameter      | Description
----------------|-------------------------------------------------
-loader\_module | Name of the data loader module in src.loader
-loader\_params | Data-loader specific parameters
+Parameter       | Description
+----------------|-------------------------------------------------
+`loader_module` | Name of the data loader module in src.loader
+`loader_params` | Data-loader specific parameters
 
 ### Architecture
 
-Parameter       | Description
-----------------|-----------------------------------------------------------------------------
-layers          | Number of layers
-hidden\_size    | Number of nodes of the hidden layers
-activation      | Activation function. `relu`, `leaky_relu` or `elu`
-dropout         | Dropout fraction
-prior\_prec     | Gaussian prior standard deviation of the Bayesian network
-std\_init       | Logarithm of the initial standard deviation of the Bayesian network weights
-negative\_slope | Negative slope of the leaky ReLU activation
+Parameter        | Description
+-----------------|----------------------------------------------------------------------------
+`layers`         | Number of layers
+`hidden_size`    | Number of nodes of the hidden layers
+`activation`     | Activation function. `relu`, `leaky_relu` or `elu`
+`dropout`        | Dropout fraction
+`prior_prec`     | Gaussian prior standard deviation of the Bayesian network
+`std_init`       | Logarithm of the initial standard deviation of the Bayesian network weights
+`negative_slope` | Negative slope of the leaky ReLU activation
 
 ### Training
 
 Parameter         | Description
 ------------------|--------------------------------------------------------
-bayesian          | Train as a Bayesian network
-batch\_size       | Batch size
-lr                | Initial learning rate
-betas             | Adam optimizer betas
-eps               | Adam optimizer eps
-weight\_decay     | L2 weight decay
-lr\_scheduler     | Type of LR scheduler: `one_cycle` or `step`
-max\_lr           | One Cycle scheduler: maximum LR
-lr\_decay\_epochs | Step scheduler: Epochs after which to reduce the LR
-lr\_decay\_factor | Step scheduler: Decay factor
-epochs            | Number of epochs
+`bayesian`        | Train as a Bayesian network
+`batch_size`      | Batch size
+`lr`              | Initial learning rate
+`betas`           | Adam optimizer betas
+`eps`             | Adam optimizer eps
+`weight_decay`    | L2 weight decay
+`lr_scheduler`    | Type of LR scheduler: `one_cycle` or `step`
+`max_lr`          | One Cycle scheduler: maximum LR
+`lr_decay_epochs` | Step scheduler: Epochs after which to reduce the LR
+`lr_decay_factor` | Step scheduler: Decay factor
+`epochs`          | Number of epochs
 
 ### Evaluation
 
-Parameter         | Description
-------------------|-------------------------------------------------------------
-bayesian\_samples | Number of samples to draw from the network weight posterior
-lower\_thresholds | List of lower weight thresholds for the clustering plots
-upper\_thresholds | List of upper weight thresholds for the clustering plots
+Parameter          | Description
+-------------------|-------------------------------------------------------------
+`bayesian_samples` | Number of samples to draw from the network weight posterior
+`lower_thresholds` | List of lower weight thresholds for the clustering plots
+`upper_thresholds` | List of upper weight thresholds for the clustering plots
