@@ -88,7 +88,8 @@ class Plots:
                 pdf,
                 "learning rate",
                 (self.losses["lr"], ),
-                (None, )
+                (None, ),
+                "log"
             )
 
 
@@ -97,7 +98,8 @@ class Plots:
         pdf: PdfPages,
         ylabel: str,
         curves: tuple[np.ndarray],
-        labels: tuple[str]
+        labels: tuple[str],
+        yscale: str = "linear"
     ):
         """
         Makes single loss plot.
@@ -107,6 +109,7 @@ class Plots:
             ylabel: Y axis label
             curves: List of numpy arrays with the loss curves to be plotted
             labels: Labels of the loss curves
+            yscale: Y axis scale, "linear" or "log"
         """
         fig, ax = plt.subplots(figsize=(4,3.5))
         for i, (curve, label) in enumerate(zip(curves, labels)):
@@ -122,6 +125,7 @@ class Plots:
             verticalalignment = "top",
             transform = ax.transAxes
         )
+        ax.set_yscale(yscale)
         if any(label is not None for label in labels):
             ax.legend(loc="center right", frameon=False)
         plt.savefig(pdf, format="pdf", bbox_inches="tight")
@@ -309,6 +313,7 @@ class Plots:
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlim(bins[0], bins[-1])
+        ax.legend(frameon=False)
         plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 

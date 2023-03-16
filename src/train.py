@@ -184,14 +184,15 @@ class DiscriminatorTraining:
             train_loss = torch.stack(epoch_losses).mean()
             self.losses["train_loss"].append(train_loss.item())
             self.losses["val_loss"].append(val_loss.item())
-            self.losses["lr"].append(self.optimizer.param_groups[0]["lr"])
+            epoch_lr = self.optimizer.param_groups[0]["lr"]
+            self.losses["lr"].append(epoch_lr)
             if self.bayesian:
                 self.losses["train_bce_loss"].append(torch.stack(epoch_bce_losses).mean().item())
                 self.losses["train_kl_loss"].append(torch.stack(epoch_kl_losses).mean().item())
                 self.losses["val_bce_loss"].append(val_bce_loss.item())
                 self.losses["val_kl_loss"].append(val_kl_loss.item())
             print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
-                  f"val loss {val_loss:.6f}")
+                  f"val loss {val_loss:.6f}, LR {epoch_lr:.3e}", flush=True)
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss

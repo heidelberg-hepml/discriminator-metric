@@ -4,6 +4,7 @@ from importlib import import_module
 import torch
 import pickle
 import numpy as np
+import os
 
 from .documenter import Documenter
 from .train import DiscriminatorTraining
@@ -45,16 +46,16 @@ def main():
         print(f"  Val points: {len(data.val_true)} truth, {len(data.val_fake)} generated")
 
         print("  Building model")
-        model_dir = doc.get_file(f"model_{data.suffix}.pth")
+        model_dir = doc.get_file(f"model_{data.suffix}")
         os.makedirs(model_dir, exist_ok=True)
         training = DiscriminatorTraining(params, device, data, model_dir)
 
-        if args.load_model:
-            print("  Loading model")
-            training.load(args.model_name)
-        else:
+        if not args.load_model:
             print("  Running training")
             training.train()
+
+        print(f"  Loading model {args.model_name}")
+        training.load(args.model_name)
 
         if args.load_model and args.load_weights:
             print("  Loading weights")
