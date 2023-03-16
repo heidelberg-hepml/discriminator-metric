@@ -140,7 +140,7 @@ class Plots:
         Args:
             file: Output file name
         """
-        scores = np.concatenate((self.weights_true, self.weights_fake), axis=0)
+        scores = -np.concatenate((1/self.weights_true, self.weights_fake), axis=0)
         labels = np.concatenate((
             np.ones_like(self.weights_true),
             np.zeros_like(self.weights_fake)
