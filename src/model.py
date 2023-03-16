@@ -45,7 +45,7 @@ class Discriminator(nn.Module):
                 self.bayesian_layers.append(layer)
             layers.append(layer)
             if dropout > 0:
-                self.layers.append(nn.Dropout(p=dropout))
+                layers.append(nn.Dropout(p=dropout))
             layers.append(activation())
             layer_size = hidden_size
         layer = layer_class(layer_size, 1, **layer_kwargs)

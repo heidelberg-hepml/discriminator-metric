@@ -276,7 +276,7 @@ class Plots:
             ax,
             bins,
             y_combined / np.sum(y_combined),
-            y_combined_err / np.sum(y_combined),
+            y_combined_err / np.sum(y_combined) if y_combined_err is not None else None,
             label = "Comb",
             color = self.colors[0]
         )
@@ -284,7 +284,7 @@ class Plots:
             ax,
             bins,
             y_true / np.sum(y_true),
-            y_true_err / np.sum(y_true),
+            y_true_err / np.sum(y_true) if y_true_err is not None else None,
             label = "Truth",
             color = self.colors[1]
         )
@@ -292,7 +292,7 @@ class Plots:
             ax,
             bins,
             y_fake / np.sum(y_fake),
-            y_fake_err / np.sum(y_fake),
+            y_fake_err / np.sum(y_fake) if y_fake_err is not None else None,
             label = "Gen",
             color = self.colors[2]
         )

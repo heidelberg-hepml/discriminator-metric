@@ -47,7 +47,7 @@ Parameter        | Description
 ### Training
 
 Parameter         | Description
-------------------|--------------------------------------------------------
+------------------|---------------------------------------------------------------------------
 `bayesian`        | Train as a Bayesian network
 `batch_size`      | Batch size
 `lr`              | Initial learning rate
@@ -59,6 +59,7 @@ Parameter         | Description
 `lr_decay_epochs` | Step scheduler: Epochs after which to reduce the LR
 `lr_decay_factor` | Step scheduler: Decay factor
 `epochs`          | Number of epochs
+`train_samples`   | Total number of samples used for training (alternative to number of epochs)
 
 ### Evaluation
 

@@ -94,6 +94,12 @@ class DiscriminatorTraining:
         """
         Initialized the LR scheduler. Currently, one-cycle and step schedulers are supported.
         """
+        if "epochs" in self.params:
+            self.epochs = self.params["epochs"]
+        else:
+            self.epochs = int(
+                self.params["train_samples"] / self.params["batch_size"] / self.train_batches
+            )
         self.scheduler_type = self.params.get("lr_scheduler", "one_cycle")
         if self.scheduler_type == "step":
             self.scheduler = torch.optim.lr_scheduler.StepLR(
@@ -105,7 +111,7 @@ class DiscriminatorTraining:
             self.scheduler = torch.optim.lr_scheduler.OneCycleLR(
                 self.optimizer,
                 self.params.get("max_lr", self.params["lr"]*10),
-                epochs = self.params["epochs"],
+                epochs = self.epochs,
                 steps_per_epoch=self.train_batches
             )
         else:
@@ -144,7 +150,7 @@ class DiscriminatorTraining:
         """
         Main training loop
         """
-        for epoch in range(self.params["epochs"]):
+        for epoch in range(self.epochs):
             self.model.train()
             epoch_losses, epoch_bce_losses, epoch_kl_losses = [], [], []
             for (x_true, ), (x_fake, ) in zip(self.train_loader_true, self.train_loader_fake):
