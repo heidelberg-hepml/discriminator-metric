@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("paramfile")
     parser.add_argument("--load_model", action="store_true")
+    parser.add_argument("--model_name", type=str, default="best")
     parser.add_argument("--load_weights", action="store_true")
     args = parser.parse_args()
 
@@ -44,17 +45,16 @@ def main():
         print(f"  Val points: {len(data.val_true)} truth, {len(data.val_fake)} generated")
 
         print("  Building model")
-        training = DiscriminatorTraining(params, device, data)
+        model_dir = doc.get_file(f"model_{data.suffix}.pth")
+        os.makedirs(model_dir, exist_ok=True)
+        training = DiscriminatorTraining(params, device, data, model_dir)
 
         if args.load_model:
             print("  Loading model")
-            training.load(doc.get_file(f"model_{data.suffix}.pth"))
-
-        if not args.load_model:
+            training.load(args.model_name)
+        else:
             print("  Running training")
             training.train()
-            print("  Saving model")
-            training.save(doc.get_file(f"model_{data.suffix}.pth"))
 
         if args.load_model and args.load_weights:
             print("  Loading weights")

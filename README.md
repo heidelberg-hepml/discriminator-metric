@@ -16,6 +16,11 @@ Loading a trained model:
 python -m src --load_model 20230303_100000_run_name
 ```
 
+Loading a specific trained model (e.g. best model, final model, checkpoint):
+```
+python -m src --load_model --model_name=final 20230303_100000_run_name
+```
+
 Loading a trained model, but compute weights again:
 ```
 python -m src --load_model --load_weights 20230303_100000_run_name
@@ -60,6 +65,7 @@ Parameter         | Description
 `lr_decay_factor` | Step scheduler: Decay factor
 `epochs`          | Number of epochs
 `train_samples`   | Total number of samples used for training (alternative to number of epochs)
+`checkpoint_interval` | If value n set, save the model after every n epochs
 
 ### Evaluation
 

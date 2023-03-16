@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import numpy as np
@@ -15,7 +16,8 @@ class DiscriminatorTraining:
         self,
         params: dict,
         device: torch.device,
-        data: DiscriminatorData
+        data: DiscriminatorData,
+        model_path: str
     ):
         """
         Build the network and data loaders.
@@ -24,10 +26,12 @@ class DiscriminatorTraining:
             params: Dict with architecture and training hyperparameters
             device: Pytorch device used for training and evaluation
             data: DiscriminatorData object containing the training and evaluation data
+            model_path: Path to a directory where models are saved
         """
         self.params = params
         self.device = device
         self.data = data
+        self.model_path = model_path
 
         self.init_data_loaders()
         self.model = Discriminator(data.dim, params)
@@ -150,6 +154,8 @@ class DiscriminatorTraining:
         """
         Main training loop
         """
+        best_val_loss = 1e20
+        checkpoint_interval = self.params.get("checkpoint_interval")
         for epoch in range(self.epochs):
             self.model.train()
             epoch_losses, epoch_bce_losses, epoch_kl_losses = [], [], []
@@ -178,6 +184,15 @@ class DiscriminatorTraining:
                 self.losses["val_kl_loss"].append(val_kl_loss.item())
             print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
                   f"val loss {val_loss:.6f}")
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                self.save("best")
+
+            if checkpoint_interval is not None and (epoch+1) % checkpoint_interval == 0:
+                self.save(f"epoch_{epoch}")
+
+        self.save("final")
 
 
     def val_loss(self) -> tuple[torch.Tensor, ...]:
@@ -267,13 +282,14 @@ class DiscriminatorTraining:
             return w_true.cpu().numpy(), w_fake.cpu().numpy(), clf_score.cpu().numpy()
 
 
-    def save(self, file: str):
+    def save(self, name: str):
         """
         Saves the model, optimizer and losses.
 
         Args:
-            file: Output file name
+            name: File name for the model (without path and extension)
         """
+        file = os.path.join(self.model_path, f"{name}.pth")
         torch.save({
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
@@ -281,13 +297,14 @@ class DiscriminatorTraining:
         }, file)
 
 
-    def load(self, file: str):
+    def load(self, name: str):
         """
         Loads the model, optimizer and losses.
 
         Args:
-            file: Input file name
+            name: File name for the model (without path and extension)
         """
+        file = os.path.join(self.model_path, f"{name}.pth")
         state_dicts = torch.load(file, map_location=self.device)
         self.optimizer.load_state_dict(state_dicts["optimizer"])
         self.model.load_state_dict(state_dicts["model"])
