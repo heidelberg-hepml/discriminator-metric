@@ -118,6 +118,12 @@ class DiscriminatorTraining:
                 epochs = self.epochs,
                 steps_per_epoch=self.train_batches
             )
+        elif self.scheduler_type == "reduce_on_plateau":
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                factor = self.params["lr_decay_factor"],
+                patience = self.params["lr_patience"]
+            )
         else:
             raise ValueError(f"Unknown LR scheduler '{self.scheduler_type}'")
 
@@ -169,10 +175,12 @@ class DiscriminatorTraining:
                 self.optimizer.step()
                 if self.scheduler_type == "one_cycle":
                     self.scheduler.step()
+            val_loss, val_bce_loss, val_kl_loss = self.val_loss()
             if self.scheduler_type == "step":
                 self.scheduler.step()
+            elif self.scheduler_type == "reduce_on_plateau":
+                self.scheduler.step(val_loss)
 
-            val_loss, val_bce_loss, val_kl_loss = self.val_loss()
             train_loss = torch.stack(epoch_losses).mean()
             self.losses["train_loss"].append(train_loss.item())
             self.losses["val_loss"].append(val_loss.item())

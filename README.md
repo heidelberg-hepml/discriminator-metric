@@ -59,10 +59,11 @@ Parameter         | Description
 `betas`           | Adam optimizer betas
 `eps`             | Adam optimizer eps
 `weight_decay`    | L2 weight decay
-`lr_scheduler`    | Type of LR scheduler: `one_cycle` or `step`
+`lr_scheduler`    | Type of LR scheduler: `one_cycle`, `step`, `reduce_on_plateau`
 `max_lr`          | One Cycle scheduler: maximum LR
 `lr_decay_epochs` | Step scheduler: Epochs after which to reduce the LR
-`lr_decay_factor` | Step scheduler: Decay factor
+`lr_decay_factor` | Step and reduce on plateau schedulers: Decay factor
+`lr_patience`     | Reduce on plateau scheduler: Number of epochs without improvement for reduction.
 `epochs`          | Number of epochs
 `train_samples`   | Total number of samples used for training (alternative to number of epochs)
 `checkpoint_interval` | If value n set, save the model after every n epochs
