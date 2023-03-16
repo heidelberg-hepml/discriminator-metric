@@ -1,28 +1,36 @@
-run_name: test
+run_name: prec_inn
 
 # Dataset
-loader_module: .prec_inn_loader
+loader_module: prec_inn
 loader_params:
   truth_file: data/truth.h5
   generated_file: data/generated.h5
+  include_momenta: True
   append_mass: True
   append_delta_r: True
   train_split: 0.45
   test_split: 0.5
 
 # Model
-activation: relu
-dropout: 0.0
-layers: 8
+activation: leaky_relu
+negative_slope: 0.1
+dropout: 0.1
+layers: 5
 hidden_size: 256
 
 # Training
 bayesian: False
-lr: 1.e-4
+lr: 1.e-3
 betas: [0.9, 0.99]
 weight_decay: 0.0
-epochs: 1
+epochs: 50
 batch_size: 1024
-lr_scheduler: one_cycle
-max_lr: 1.e-3
+lr_scheduler: reduce_on_plateau
+lr_decay_factor: 0.1
+lr_patience: 5
+checkpoint_interval: 5
 
+# Evaluation
+#bayesian_samples: 2
+lower_cluster_thresholds: [0.01, 0.1]
+upper_cluster_thresholds: [0.9, 0.99]
