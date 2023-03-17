@@ -640,7 +640,11 @@ class Plots:
                 axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
 
             if show_weights:
-                axs[1+int(show_ratios)].set_ylabel(r"$w$")
+                ax_idx = 1+int(show_ratios)
+                axs[ax_idx].set_ylabel(r"$w$")
+                axs[ax_idx].axhline(y=1, c="black", ls="--", lw=0.7)
+                ymin, ymax = axs[ax_idx].get_ylim()
+                axs[ax_idx].set_ylim(ymin, min(ymax, 2))
 
             unit = "" if observable.unit is None else f" [{observable.unit}]"
             axs[-1].set_xlabel(f"${{{observable.tex_label}}}${unit}")
