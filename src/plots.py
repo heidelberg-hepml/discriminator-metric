@@ -9,8 +9,8 @@ from .observable import Observable
 
 Line = namedtuple(
     "Line",
-    ["y", "y_err", "y_ref", "y_orig", "label", "color"],
-    defaults = [None, None, None, None, None]
+    ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill"],
+    defaults = [None, None, None, None, None, False]
 )
 
 class Plots:
@@ -514,6 +514,7 @@ class Plots:
         for threshold in upper_thresholds:
             masks.append(weights_fake > threshold)
             labels.append(f"$w > {threshold}$")
+        true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         hists = [
             np.histogram(
                 observable.fake_data[self.fake_mask][mask],
@@ -523,8 +524,16 @@ class Plots:
             for mask in masks
         ]
         lines = [
-            Line(y=hist, label=label, color=color)
-            for hist, label, color in zip(hists, labels, self.colors)
+            Line(
+                y = true_hist,
+                label = "Truth",
+                color = "k",
+                fill = True
+            ),
+            *[
+                Line(y=hist, label=label, color=color)
+                for hist, label, color in zip(hists, labels, self.colors)
+            ]
         ]
         self.hist_plot(pdf, lines, bins, observable, show_ratios=False, show_weights=False)
 
@@ -575,7 +584,8 @@ class Plots:
                     line.y * scale,
                     line.y_err * scale if line.y_err is not None else None,
                     label=line.label,
-                    color=line.color
+                    color=line.color,
+                    fill=line.fill
                 )
 
                 ratio_panels = []
@@ -626,7 +636,8 @@ class Plots:
         y: np.ndarray,
         y_err: np.ndarray,
         label: str,
-        color: str
+        color: str,
+        fill: bool = False
     ):
         """
         Plot a stepped line for a histogram, optionally with error bars.
@@ -638,18 +649,29 @@ class Plots:
             y_err: Y errors for the bins
             label: Label of the line
             color: Color of the line
+            fill: Filled histogram
         """
 
         dup_last = lambda a: np.append(a, a[-1])
 
-        ax.step(
-            bins,
-            dup_last(y),
-            label = label,
-            color = color,
-            linewidth = 1.0,
-            where = "post",
-        )
+        if fill:
+            ax.fill_between(
+                bins,
+                dup_last(y),
+                label = label,
+                facecolor = color,
+                step = "post",
+                alpha = 0.2
+            )
+        else:
+            ax.step(
+                bins,
+                dup_last(y),
+                label = label,
+                color = color,
+                linewidth = 1.0,
+                where = "post",
+            )
         if y_err is not None:
             ax.step(
                 bins,

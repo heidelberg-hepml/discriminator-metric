@@ -36,8 +36,8 @@ def load(params: dict) -> list[DiscriminatorData]:
     multiplicity_fake = np.sum(fake_momenta[:,:,0] != 0., axis=1)
 
     subsets = [
-        #{"multiplicity": 3, "label": "$Z+1j$", "suffix": "z1j"},
-        #{"multiplicity": 4, "label": "$Z+2j$", "suffix": "z2j"},
+        {"multiplicity": 3, "label": "$Z+1j$", "suffix": "z1j"},
+        {"multiplicity": 4, "label": "$Z+2j$", "suffix": "z2j"},
         {"multiplicity": 5, "label": "$Z+3j$", "suffix": "z3j"},
     ]
     datasets = []
@@ -189,8 +189,8 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
         fake_data = obs_two_fake[(0,1)].m,
         tex_label = r"M_{\mu\mu}",
         bins = np.linspace(
-            np.quantile(obs_two_true[(0,1)].m, 0.005),
-            np.quantile(obs_two_true[(0,1)].m, 0.995),
+            70,
+            110,
             50
         ),
         unit = "GeV"

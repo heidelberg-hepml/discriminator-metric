@@ -20,14 +20,15 @@ class Discriminator(nn.Module):
         self.bayesian_layers = []
 
         if params["bayesian"]:
-            layer_class = VBLinear
-            layer_kwargs = {
-                "prior_prec": params.get("prior_prec", 1.0),
-                "std_init": params.get("std_init", -9)
-            }
-        else:
-            layer_class = nn.Linear
-            layer_kwargs = {}
+            def make_bayesian_layer(n_in, n_out):
+                layer = VBLinear(
+                    n_in,
+                    n_out,
+                    prior_prec = params.get("prior_prec", 1.0),
+                    std_init = params.get("std_init", -9)
+                )
+                self.bayesian_layers.append(layer)
+                return layer
 
         activation = {
             "relu": nn.ReLU,
@@ -40,17 +41,19 @@ class Discriminator(nn.Module):
         layer_size = input_dim
         for i in range(params["layers"] - 1):
             hidden_size = params["hidden_size"]
-            layer = layer_class(layer_size, hidden_size, **layer_kwargs)
-            if params["bayesian"]:
-                self.bayesian_layers.append(layer)
+            if params["bayesian"] and i >= params.get("skip_bayesian_layers", 0):
+                layer = make_bayesian_layer(layer_size, hidden_size)
+            else:
+                layer = nn.Linear(layer_size, hidden_size)
             layers.append(layer)
             if dropout > 0:
                 layers.append(nn.Dropout(p=dropout))
             layers.append(activation())
             layer_size = hidden_size
-        layer = layer_class(layer_size, 1, **layer_kwargs)
         if params["bayesian"]:
-            self.bayesian_layers.append(layer)
+            layer = make_bayesian_layer(layer_size, 1)
+        else:
+            layer = nn.Linear(layer_size, 1)
         layers.append(layer)
         self.layers = nn.Sequential(*layers)
 
