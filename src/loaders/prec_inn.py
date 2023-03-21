@@ -29,7 +29,9 @@ def load(params: dict) -> list[DiscriminatorData]:
         List of three DiscriminatorData objects, one for each jet multiplicity
     """
     true_momenta = pd.read_hdf(params["truth_file"]).to_numpy().reshape(-1, 5, 4)
-    fake_momenta = pd.read_hdf(params["generated_file"]).to_numpy().reshape(-1, 5, 4)
+    generated = pd.read_hdf(params["generated_file"]).to_numpy()
+    fake_momenta = generated[:,:20].reshape(-1, 5, 4)
+    fake_log_weights = generated[:,20:] if generated.shape[1] > 20 else None
     true_momenta = true_momenta[np.all(np.isfinite(true_momenta), axis=(1,2))]
     fake_momenta = fake_momenta[np.all(np.isfinite(fake_momenta), axis=(1,2))]
     multiplicity_true = np.sum(true_momenta[:,:,0] != 0., axis=1)
@@ -45,6 +47,7 @@ def load(params: dict) -> list[DiscriminatorData]:
         mult = subset["multiplicity"]
         subset_true = true_momenta[multiplicity_true == mult][:,:mult]
         subset_fake = fake_momenta[multiplicity_fake == mult][:,:mult]
+        subset_logw = fake_log_weights[multiplicity_fake == mult]
         train_true, test_true, val_true = split_data(
             subset_true,
             params["train_split"],
@@ -52,6 +55,11 @@ def load(params: dict) -> list[DiscriminatorData]:
         )
         train_fake, test_fake, val_fake = split_data(
             subset_fake,
+            params["train_split"],
+            params["test_split"]
+        )
+        train_logw, test_logw, val_logw = split_data(
+            subset_logw,
             params["train_split"],
             params["test_split"]
         )
@@ -75,6 +83,7 @@ def load(params: dict) -> list[DiscriminatorData]:
             val_true = compute_preprocessing(val_true, **preproc_kwargs),
             val_fake = compute_preprocessing(val_fake, **preproc_kwargs),
             observables = compute_observables(test_true, test_fake),
+            test_logw = test_logw,
         ))
     return datasets
 

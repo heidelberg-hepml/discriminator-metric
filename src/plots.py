@@ -1,5 +1,6 @@
 import warnings
 from collections import namedtuple
+from typing import Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -24,7 +25,8 @@ class Plots:
         weights_true: np.ndarray,
         weights_fake: np.ndarray,
         losses: dict,
-        title: str
+        title: str,
+        log_gen_weights: Optional[np.ndarray] = None
     ):
         """
         Initializes the plotting pipeline with the data to be plotted.
@@ -35,6 +37,7 @@ class Plots:
             weights_fake: Discriminator weights for generated samples
             losses: Dictionary with loss terms and learning rate as a function of the epoch
             title: Title added in all the plots
+            log_gen_weights: For Bayesian generators: sampled log weights
         """
         self.observables = observables
         self.bayesian = len(weights_true.shape) == 2
@@ -48,6 +51,7 @@ class Plots:
         self.weights_fake = weights_fake[self.fake_mask]
         self.losses = losses
         self.title = title
+        self.log_gen_weights = log_gen_weights
 
         plt.rc("font", family="serif", size=16)
         plt.rc("axes", titlesize="medium")
@@ -313,67 +317,37 @@ class Plots:
         plt.close()
 
 
-    def plot_weight_pulls(self, file: str):
+    def plot_bgen_weights(self, file: str):
         """
-        Plots histograms of the weight pulls extracted from the Bayesian network,
-        defined as (mu - 1) / sigma, where mu and sigma are mean and standard
-        deviation from sampling over the trainable weight posterior.
+        Plots 2d histogram of the error on the weights from a Bayesian generator network
+        against the weights found by the discriminator.
 
         Args:
             file: Output file name
         """
-        assert self.bayesian
-        bins = np.linspace(-5, 5, 50)
+        assert self.log_gen_weights is not None
 
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", RuntimeWarning)
+        w_bgen = np.std(self.log_gen_weights, axis=1)
+        if self.bayesian:
+            w_bgen = np.repeat(w_bgen[:,None], self.weights_fake.shape[1], axis=1).flatten()
+            w_disc = self.weights_fake.flatten()
+        else:
+            w_disc = self.weights_fake
+        x_bins = np.linspace(0,4,30)
+        y_bins = np.linspace(0,3,30)
 
-            w_normed_true = self.weights_true / np.mean(self.weights_true)
-            mu_true = np.mean(w_normed_true, axis=1)
-            sigma_true = np.std(w_normed_true, axis=1)
-            pull_true = (mu_true - 1.) / sigma_true
-
-            w_normed_fake = self.weights_fake / np.mean(self.weights_fake)
-            mu_fake = np.mean(w_normed_fake, axis=1)
-            sigma_fake = np.std(w_normed_fake, axis=1)
-            pull_fake = (mu_fake - 1.) / sigma_fake
-
-            pull_combined = np.concatenate((pull_true, pull_fake))
-            y_combined, _ = np.histogram(pull_combined, bins=bins, density=True)
-            y_true, _ = np.histogram(pull_true, bins=bins, density=True)
-            y_fake, _ = np.histogram(pull_fake, bins=bins, density=True)
-
-        fig, ax = plt.subplots(figsize=(4, 3.5))
-        self.hist_line(
-            ax,
-            bins,
-            y_combined,
-            y_err = None,
-            label = "Comb",
-            color = self.colors[0]
+        fig, ax = plt.subplots(figsize=(4,3.5))
+        ax.hist2d(
+            w_bgen,
+            w_disc,
+            bins=(x_bins, y_bins),
+            rasterized=True,
+            norm = mpl.colors.LogNorm(),
+            density=True,
+            cmap="jet"
         )
-        self.hist_line(
-            ax,
-            bins,
-            y_true,
-            y_err = None,
-            label = "Truth",
-            color = self.colors[1]
-        )
-        self.hist_line(
-            ax,
-            bins,
-            y_fake,
-            y_err = None,
-            label = "Gen",
-            color = self.colors[2]
-        )
-        self.corner_text(ax, self.title, "right", "top")
-
-        ax.set_xlabel(r"$(\mu - 1) / \sigma$")
-        ax.set_ylabel("normalized")
-        ax.set_yscale("log")
-        ax.set_xlim(bins[0], bins[-1])
+        ax.set_xlabel(r"$\sigma(\log w_\text{gen})$")
+        ax.set_ylabel(r"$w_\text{disc}$")
 
         plt.savefig(file, bbox_inches="tight")
         plt.close()

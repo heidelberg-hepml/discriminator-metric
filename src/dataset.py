@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 import numpy as np
 
 from .observable import Observable
@@ -16,6 +17,7 @@ class DiscriminatorData:
         train_fake: Training data (generated samples)
         test_true: Test data (truth samples)
         test_fake: Test data (generated samples)
+        test_logw: For Bayesian generative models: log weight distribution for test data
         val_true: Validation data (truth samples)
         val_fake: Validation data (generated samples)
         observables: List observables for plotting
@@ -30,3 +32,4 @@ class DiscriminatorData:
     val_true: np.ndarray
     val_fake: np.ndarray
     observables: list[Observable]
+    test_logw: Optional[np.ndarray] = None

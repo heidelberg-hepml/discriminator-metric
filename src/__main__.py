@@ -85,7 +85,8 @@ def main():
             weights_true,
             weights_fake,
             training.losses,
-            data.label
+            data.label,
+            data.test_logw
         )
         print("    Plotting losses")
         plots.plot_losses(doc.add_file(f"losses_{data.suffix}.pdf"))
@@ -93,9 +94,9 @@ def main():
         plots.plot_roc(doc.add_file(f"roc_{data.suffix}.pdf"))
         print("    Plotting weights")
         plots.plot_weight_hist(doc.add_file(f"weights_{data.suffix}.pdf"))
-        if plots.bayesian:
-            print("    Plotting pulls")
-            plots.plot_weight_pulls(doc.add_file(f"pulls_{data.suffix}.pdf"))
+        if data.test_logw is not None:
+            print("    Plotting generator errors")
+            plots.plot_bgen_weights(doc.add_file(f"gen_errors_{data.suffix}.pdf"))
         print("    Plotting observables")
         plots.plot_observables(doc.add_file(f"observables_{data.suffix}.pdf"))
         lower_thresholds = params.get("lower_cluster_thresholds", [])
