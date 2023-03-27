@@ -3,11 +3,13 @@ run_name: calo_inn
 #Dataset
 loader_module: calo_inn
 loader_params: 
-  geant_file: path_to_file.hdf5
-  generated_file: path_to_file.hdf5
+  geant_file: /remote/gpu06/favaro/calo_inn/datasets/cls_data/train_cls_piplus.hdf5
+  generated_file: /remote/gpu06/favaro/calo_inn/datasets/train_piplus.hdf5
   add_log_energy: True
   add_log_layer_ens: True
   add_logit_step: False
+  train_split: 0.6
+  test_split: 0.2
   
 # Model
 activation: leaky_relu
