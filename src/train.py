@@ -64,7 +64,7 @@ class DiscriminatorTraining:
         """
         make_loader = lambda data, mode: torch.utils.data.DataLoader(
             dataset = torch.utils.data.TensorDataset(
-                torch.tensor(data, device=self.device)
+                torch.tensor(data, device=self.device, dtype=torch.get_default_dtype())
             ),
             batch_size = self.params["batch_size"],
             shuffle = mode == "train",

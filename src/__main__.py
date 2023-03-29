@@ -34,6 +34,15 @@ def main():
     print("Using device " + ("GPU" if use_cuda else "CPU"))
     device = torch.device("cuda:0" if use_cuda else "cpu")
 
+    dtype = params.get('dtype', 'float32')
+    if dtype=='float64':
+        torch.set_default_dtype(torch.float64)
+    elif dtype=='float16':
+        torch.set_default_dtype(torch.float16)
+    elif dtype=='float32':
+        torch.set_default_dtype(torch.float32)
+    print("Using dtype {}".format(dtype))
+
     print("Loading data")
     loader = import_module(f"src.loaders.{params['loader_module']}")
     datasets = loader.load(params["loader_params"])
