@@ -202,8 +202,8 @@ class DiscriminatorTraining:
                 print(f"    Epoch {epoch:3d}: train loss {train_loss:.6f}, " +
                       f"val loss {val_loss:.6f}, LR {epoch_lr:.3e}", flush=True)
 
-            if val_bce_loss < best_val_loss:
-                best_val_loss = val_bce_loss
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
                 self.save("best")
 
             if checkpoint_interval is not None and (epoch+1) % checkpoint_interval == 0:
