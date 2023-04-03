@@ -139,7 +139,7 @@ def compute_preprocessing(
         input_obs.append(mass)
 
     if append_delta_r:
-        drinv = lambda x: x #np.minimum(1/(x+1e-7), 20)
+        drinv = lambda x: np.minimum(1/(x+1e-7), 20)
         if mult > 3:
             input_obs.append(drinv(dr(obs.phi[:,2], obs.phi[:,3], obs.eta[:,2], obs.eta[:,3])))
         if mult > 4:

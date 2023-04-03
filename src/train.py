@@ -286,7 +286,7 @@ class DiscriminatorTraining:
             ])
             y_true_sig = y_true.sigmoid().flatten()
             y_fake_sig = y_fake.sigmoid().flatten()
-            w_true = (1 - y_true_sig) / y_true_sig
+            w_true = y_true_sig / (1 - y_true_sig)
             w_fake = y_fake_sig / (1 - y_fake_sig)
             min_size = min(len(y_true), len(y_fake))
             clf_score = self.loss(

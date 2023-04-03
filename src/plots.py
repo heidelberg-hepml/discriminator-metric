@@ -137,7 +137,7 @@ class Plots:
         Args:
             file: Output file name
         """
-        scores = -np.concatenate((1/self.weights_true, self.weights_fake), axis=0)
+        scores = -np.concatenate((self.weights_true, self.weights_fake), axis=0)
         labels = np.concatenate((
             np.ones_like(self.weights_true),
             np.zeros_like(self.weights_fake)
@@ -231,20 +231,17 @@ class Plots:
         if self.bayesian:
             true_hists = np.stack([
                 np.histogram(
-                    self.weights_true[:,i] / np.mean(self.weights_true[:,i]),
-                    bins=bins
+                    self.weights_true[:,i], bins=bins
                 )[0] for i in range(self.weights_true.shape[1])
             ], axis=1)
             fake_hists = np.stack([
                 np.histogram(
-                    self.weights_fake[:,i] / np.mean(self.weights_fake[:,i]),
-                    bins=bins
+                    self.weights_fake[:,i], bins=bins
                 )[0] for i in range(self.weights_fake.shape[1])
             ], axis=1)
             combined_hists = np.stack([
                 np.histogram(
-                    weights_combined[:,i] / np.mean(weights_combined[:,i]),
-                    bins=bins
+                    weights_combined[:,i], bins=bins
                 )[0] for i in range(weights_combined.shape[1])
             ], axis=1)
 
@@ -263,14 +260,6 @@ class Plots:
                 np.quantile(combined_hists, 0.159, axis=1),
                 np.quantile(combined_hists, 0.841, axis=1)
             ), axis=0)
-
-            #y_true = np.mean(true_hists, axis=1)
-            #y_true_err = np.std(true_hists, axis=1)
-            #y_fake = np.mean(fake_hists, axis=1)
-            #y_fake_err = np.std(fake_hists, axis=1)
-            #y_combined = np.mean(combined_hists, axis=1)
-            #y_combined_err = np.std(combined_hists, axis=1)
-
         else:
             y_true = np.histogram(self.weights_true, bins=bins)[0]
             y_true_err = None
