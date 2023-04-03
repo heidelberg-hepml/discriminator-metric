@@ -86,7 +86,7 @@ def create_data(data_path, dataset_list, **kwargs):
  
     if kwargs['add_log_energy']:
         data = np.concatenate((data, np.log10(en_test*10).reshape(-1, 1)), axis=1)
-    data = np.nan_to_num(data, posinf=0, neginf=0)
+    #data = np.nan_to_num(data, posinf=0, neginf=0)
         
     en0_t = np.log10(en0_t + 1e-8) + 2.
     en1_t = np.log10(en1_t + 1e-8) +2.
