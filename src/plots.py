@@ -26,7 +26,9 @@ class Plots:
         weights_fake: np.ndarray,
         losses: dict,
         title: str,
-        log_gen_weights: Optional[np.ndarray] = None
+        labels_w_hist: list[str],
+        add_comb: bool,
+        log_gen_weights: Optional[np.ndarray] = None,
     ):
         """
         Initializes the plotting pipeline with the data to be plotted.
@@ -38,20 +40,18 @@ class Plots:
             losses: Dictionary with loss terms and learning rate as a function of the epoch
             title: Title added in all the plots
             log_gen_weights: For Bayesian generators: sampled log weights
+            labels: Labels of weight histograms
+            add_comb: add combined weights hist line
         """
         self.observables = observables
         self.bayesian = len(weights_true.shape) == 2
-        self.true_mask = np.all(np.isfinite(
-            weights_true if self.bayesian else weights_true[:,None]
-        ), axis=1)
-        self.fake_mask = np.all(np.isfinite(
-            weights_fake if self.bayesian else weights_fake[:,None]
-        ), axis=1)
-        self.weights_true = weights_true[self.true_mask]
-        self.weights_fake = weights_fake[self.fake_mask]
+        self.weights_true, self.weights_fake = self.process_weights(weights_true, weights_fake)
         self.losses = losses
         self.title = title
         self.log_gen_weights = log_gen_weights
+        self.labels_w_hist = labels_w_hist
+        self.add_comb = add_comb
+        self.eps = 1.0e-10
 
         plt.rc("font", family="serif", size=16)
         plt.rc("axes", titlesize="medium")
@@ -59,6 +59,17 @@ class Plots:
         plt.rc("text", usetex=True)
         self.colors = [f"C{i}" for i in range(10)]
 
+    def process_weights(self, weights_true, weights_fake):
+        w_comb = np.concatenate((weights_true, weights_fake), axis=0)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0.5)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.5)
+
+        weights_true[weights_true >= self.p_high] = self.p_high
+        weights_fake[weights_fake <= self.p_low] = self.p_low
+
+        weights_true[weights_true <= self.p_low] = self.p_low
+        weights_fake[weights_fake >= self.p_high] = self.p_high
+        return weights_true, weights_fake
 
     def plot_losses(self, file: str):
         """
@@ -115,7 +126,7 @@ class Plots:
             labels: Labels of the loss curves
             yscale: Y axis scale, "linear" or "log"
         """
-        fig, ax = plt.subplots(figsize=(4,3.5))
+        fig, ax = plt.subplots(figsize=(5,5))
         for i, (curve, label) in enumerate(zip(curves, labels)):
             epochs = np.arange(1, len(curve)+1)
             ax.plot(epochs, curve, label=label)
@@ -185,29 +196,31 @@ class Plots:
             file: Output file name
         """
         with PdfPages(file) as pdf:
-            clean_array = lambda a: a[np.isfinite(a)]
             wmin = min(
-                np.min(self.weights_true[self.weights_true != 0]),
-                np.min(self.weights_fake[self.weights_fake != 0])
+                np.min(self.weights_true),
+                np.min(self.weights_fake)
             )
             wmax = max(np.max(self.weights_true), np.max(self.weights_fake))
             self.plot_single_weight_hist(
                 pdf,
                 bins=np.linspace(0, 3, 50),
                 xscale="linear",
-                yscale="linear"
+                yscale="linear",
+                secax=True,
             )
             self.plot_single_weight_hist(
                 pdf,
-                bins=np.logspace(np.log10(wmin), np.log10(wmax), 50),
-                xscale="log",
-                yscale="log"
+                bins=np.logspace(np.log10(self.p_low-self.eps), np.log10(self.p_high+self.eps), 50),
+                xscale="symlog",
+                yscale="log",
+                secax=False,
             )
             self.plot_single_weight_hist(
                 pdf,
                 bins=np.logspace(-2, 1, 50),
                 xscale="log",
-                yscale="log"
+                yscale="log",
+                secax=False,
             )
 
 
@@ -216,7 +229,8 @@ class Plots:
         pdf: PdfPages,
         bins: np.ndarray,
         xscale: str,
-        yscale: str
+        yscale: str,
+        secax: bool
     ):
         """
         Plots a single weight histogram.
@@ -226,6 +240,7 @@ class Plots:
             bins: Numpy array with the bin boundaries
             xscale: X axis scale, "linear" or "log"
             yscale: Y axis scale, "linear" or "log"
+            secax: secondary axes for linear plot
         """
         weights_combined = np.concatenate((self.weights_true, self.weights_fake), axis=0)
         if self.bayesian:
@@ -269,20 +284,21 @@ class Plots:
             y_combined_err = None
 
         fig, ax = plt.subplots(figsize=(4, 3.5))
-        self.hist_line(
-            ax,
-            bins,
-            y_combined / np.sum(y_combined),
-            y_combined_err / np.sum(y_combined) if y_combined_err is not None else None,
-            label = "Comb",
-            color = self.colors[0]
-        )
+        if self.add_comb:
+            self.hist_line(
+                ax,
+                bins,
+                y_combined / np.sum(y_combined),
+                y_combined_err / np.sum(y_combined) if y_combined_err is not None else None,
+                label = self.labels_w_hist[0],
+                color = self.colors[0]
+            )
         self.hist_line(
             ax,
             bins,
             y_true / np.sum(y_true),
             y_true_err / np.sum(y_true) if y_true_err is not None else None,
-            label = "Truth",
+            label = self.labels_w_hist[1],
             color = self.colors[1]
         )
         self.hist_line(
@@ -290,15 +306,31 @@ class Plots:
             bins,
             y_fake / np.sum(y_fake),
             y_fake_err / np.sum(y_fake) if y_fake_err is not None else None,
-            label = "Gen",
+            label = self.labels_w_hist[2],
             color = self.colors[2]
         )
         self.corner_text(ax, self.title, "right", "top")
-        ax.set_xlabel("weight")
-        ax.set_ylabel("normalized")
-        ax.set_xscale(xscale)
+        ax.set_xlabel("$w(x)$")
+        ax.set_ylabel("a.u.")
+        if xscale == 'symlog':
+            ax.set_xscale(xscale, linthresh=self.p_low)
+        else:
+            ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlim(bins[0], bins[-1])
+        
+        #adding Delta
+        if secax:
+            def wtoD(x):
+                return x-1
+
+            def Dtow(x):
+                return x+1
+
+            secax = ax.secondary_xaxis('top', functions=(wtoD, Dtow))
+            secax.set_xlabel('$\Delta(x)$')
+            secax.tick_params()
+        
         if yscale == "linear":
             ax.set_ylim(bottom=0)
         ax.legend(frameon=False)

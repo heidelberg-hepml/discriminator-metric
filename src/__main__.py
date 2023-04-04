@@ -89,13 +89,18 @@ def main():
             print(f"  Classifier score: {clf_score:.7f}")
 
         print("  Creating plots")
+        lab_def = ["Comb.", "True", "Gen."]
+        labels = params.get('w_labels', lab_def)
+        add_comb = params.get('add_w_comb', True)
         plots = Plots(
             data.observables,
             weights_true,
             weights_fake,
             training.losses,
             data.label,
-            data.test_logw
+            labels,
+            add_comb,
+            data.test_logw,
         )
         print("    Plotting losses")
         plots.plot_losses(doc.add_file(f"losses_{data.suffix}.pdf"))

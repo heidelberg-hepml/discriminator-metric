@@ -73,11 +73,18 @@ def create_data(data_path, dataset_list, **kwargs):
         lay_0 = f.get('layer_0')[:] / 1e5
         lay_1 = f.get('layer_1')[:] / 1e5
         lay_2 = f.get('layer_2')[:] / 1e5
-    data = np.concatenate((lay_0.reshape(-1, 288), lay_1.reshape(-1, 144), lay_2.reshape(-1, 72)), axis=1)
+    
+    torch_dtype = torch.get_default_dtype()
+    lay_0 = torch.tensor(lay_0).to(torch_dtype)
+    lay_1 = torch.tensor(lay_1).to(torch_dtype)
+    lay_2 = torch.tensor(lay_2).to(torch_dtype)
+    en_test = torch.tensor(en_test).to(torch_dtype)
 
-    en0_t = np.sum(data[:, :288], axis=1, keepdims=True)
-    en1_t = np.sum(data[:, 288:432], axis=1, keepdims=True)
-    en2_t = np.sum(data[:, 432:], axis=1, keepdims=True)
+    data = torch.cat((lay_0.reshape(-1, 288), lay_1.reshape(-1, 144), lay_2.reshape(-1, 72)), axis=1)
+
+    en0_t = torch.sum(data[:, :288], axis=1, keepdims=True)
+    en1_t = torch.sum(data[:, 288:432], axis=1, keepdims=True)
+    en2_t = torch.sum(data[:, 432:], axis=1, keepdims=True)
 	
     if dataset_list['normalize']:
         data[:, :288] /= en0_t + 1e-16
@@ -85,15 +92,15 @@ def create_data(data_path, dataset_list, **kwargs):
         data[:, 432:] /= en2_t + 1e-16
  
     if kwargs['add_log_energy']:
-        data = np.concatenate((data, np.log10(en_test*10).reshape(-1, 1)), axis=1)
+        data = torch.cat((data, torch.log10(en_test*10).reshape(-1, 1)), axis=1)
     #data = np.nan_to_num(data, posinf=0, neginf=0)
         
-    en0_t = np.log10(en0_t + 1e-8) + 2.
-    en1_t = np.log10(en1_t + 1e-8) +2.
-    en2_t = np.log10(en2_t + 1e-8) +2.
+    en0_t = torch.log10(en0_t + 1e-8) + 2.
+    en1_t = torch.log10(en1_t + 1e-8) +2.
+    en2_t = torch.log10(en2_t + 1e-8) +2.
  
     if kwargs['add_log_layer_ens']:
-        data = np.concatenate((data, en0_t, en1_t, en2_t), axis=1)
+        data = torch.cat((data, en0_t, en1_t, en2_t), axis=1)
     if kwargs['add_logit_step']:
         raise ValueError('Not implemented yet')
     return data
@@ -105,12 +112,13 @@ def create_data_high(data_path, dataset_list, **kwargs):
         lay_0 = f.get('layer_0')[:] / 1e5
         lay_1 = f.get('layer_1')[:] / 1e5
         lay_2 = f.get('layer_2')[:] / 1e5
-
-    incident_energy = torch.log10(torch.tensor(en_test)*10.)
+    torch_dtype = torch.get_default_dtype()
+    
+    incident_energy = torch.log10(torch.tensor(en_test).to(torch_dtype)*10.)
     # scale them back to MeV
-    layer0 = torch.tensor(lay_0) * 1e5
-    layer1 = torch.tensor(lay_1) * 1e5
-    layer2 = torch.tensor(lay_2) * 1e5
+    layer0 = torch.tensor(lay_0).to(torch_dtype) * 1e5
+    layer1 = torch.tensor(lay_1).to(torch_dtype) * 1e5
+    layer2 = torch.tensor(lay_2).to(torch_dtype) * 1e5
     layer0 = to_np_thres(layer0.view(layer0.shape[0], -1), cut)
     layer1 = to_np_thres(layer1.view(layer1.shape[0], -1), cut)
     layer2 = to_np_thres(layer2.view(layer2.shape[0], -1), cut)
