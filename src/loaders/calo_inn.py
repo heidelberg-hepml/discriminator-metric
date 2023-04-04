@@ -19,6 +19,13 @@ def load(params: dict) -> list[DiscriminatorData]:
 
     """
     datasets = []
+    p_type = params.get('p_type', None)
+    if p_type == 'pions':
+        p_lab = '$\pi^{+}$'
+    elif p_type == 'gammas':
+        p_lab = '$\gamma$'
+    elif p_type == 'eplus':
+        p_lab = '$e^{+}$'
     preproc_kwargs = {
             "add_log_energy": params.get("add_log_energy", False),
             "add_log_layer_ens": params.get("add_log_layer_ens", False),
@@ -26,9 +33,9 @@ def load(params: dict) -> list[DiscriminatorData]:
 			"add_cut": params.get("add_cut", 0.0),
             }
     datasets_list = [
-            {'level': 'low', 'normalize': True, 'label': 'Norm.', 'suffix': 'norm'},
-            {'level': 'low', 'normalize': False, 'label': 'Unnorm.', 'suffix': 'unnorm'},
-            {'level': 'high', 'normalize': False, 'label': 'High', 'suffix': 'high'},
+            {'level': 'low', 'normalize': False, 'label': p_lab+' Unnorm.', 'suffix': 'unnorm'},
+            {'level': 'low', 'normalize': True, 'label': p_lab+' Norm.', 'suffix': 'norm'},
+            {'level': 'high', 'normalize': False, 'label': p_lab+' High', 'suffix': 'high'},
             ] 
 
     for dataset in datasets_list:
@@ -51,7 +58,10 @@ def load(params: dict) -> list[DiscriminatorData]:
             params["train_split"],
             params["test_split"]
         )
-
+        
+        observables = []
+        if dataset['level']=='low' and dataset['normalize']==False:
+            observables = compute_energies(test_true, test_fake)
         datasets.append(DiscriminatorData(
                 label = dataset['label'],
                 suffix = dataset['suffix'],
@@ -62,7 +72,7 @@ def load(params: dict) -> list[DiscriminatorData]:
                 test_fake = test_fake,
                 val_true = val_true,
                 val_fake = val_fake,
-                observables = [],
+                observables = observables,
             )
         )
     return datasets
@@ -103,7 +113,7 @@ def create_data(data_path, dataset_list, **kwargs):
         data = torch.cat((data, en0_t, en1_t, en2_t), axis=1)
     if kwargs['add_logit_step']:
         raise ValueError('Not implemented yet')
-    return data
+    return data.numpy()
 
 def create_data_high(data_path, dataset_list, **kwargs):
     cut = kwargs['add_cut']
@@ -169,6 +179,47 @@ def create_data_high(data_path, dataset_list, **kwargs):
 
     ret = torch.cat((ret, incident_energy), 1)
     return ret.numpy()
+
+def compute_energies(true_data: np.ndarray, fake_data: np.ndarray) -> list[Observable]:
+    observables = []
+    en_0_true = np.sum(true_data[:, :288], axis=1)
+    en_0_fake = np.sum(fake_data[:, :288], axis=1)
+    en_1_true = np.sum(true_data[:,288:432], axis=1)
+    en_1_fake = np.sum(fake_data[:,288:432], axis=1)
+    en_2_true = np.sum(true_data[:,432:504], axis=1)
+    en_2_fake = np.sum(fake_data[:,432:504], axis=1)
+
+    observables.extend([
+        Observable(
+            true_data = en_0_true,
+            fake_data = en_0_fake,
+            tex_label = f'E0',
+            bins = np.logspace(-5, -1, 100),
+            xscale = 'log',
+            yscale = 'log',
+            unit = 'GeV'
+            ),
+        Observable(
+            true_data = en_1_true,
+            fake_data = en_1_fake,
+            tex_label = f'E1',
+            bins = np.logspace(-4, 0, 100),
+            xscale = 'log',
+            yscale = 'log',
+            unit = 'GeV'
+            ),
+        Observable(
+            true_data = en_2_true,
+            fake_data = en_2_fake,
+            tex_label = f'E2',
+            bins = np.logspace(-5, -1, 100),
+            xscale = 'log',
+            yscale = 'log',
+            unit = 'GeV'
+            ),
+        ])
+
+    return observables
 
 def split_data(
     data: np.ndarray,

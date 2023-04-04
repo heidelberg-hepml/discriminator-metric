@@ -61,8 +61,8 @@ class Plots:
 
     def process_weights(self, weights_true, weights_fake):
         w_comb = np.concatenate((weights_true, weights_fake), axis=0)
-        self.p_low = np.percentile(w_comb[w_comb!=0], 0.5)
-        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.5)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0.1)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.9)
 
         weights_true[weights_true >= self.p_high] = self.p_high
         weights_fake[weights_fake <= self.p_low] = self.p_low
@@ -126,7 +126,7 @@ class Plots:
             labels: Labels of the loss curves
             yscale: Y axis scale, "linear" or "log"
         """
-        fig, ax = plt.subplots(figsize=(5,5))
+        fig, ax = plt.subplots(figsize=(4,3.5))
         for i, (curve, label) in enumerate(zip(curves, labels)):
             epochs = np.arange(1, len(curve)+1)
             ax.plot(epochs, curve, label=label)
@@ -283,7 +283,7 @@ class Plots:
             y_combined = np.histogram(weights_combined, bins=bins)[0]
             y_combined_err = None
 
-        fig, ax = plt.subplots(figsize=(4, 3.5))
+        fig, ax = plt.subplots(figsize=(4.5, 4.5))
         if self.add_comb:
             self.hist_line(
                 ax,
@@ -400,7 +400,7 @@ class Plots:
         if self.bayesian:
             rw_hists = np.stack([
                 np.histogram(
-                    observable.fake_data[self.fake_mask],
+                    observable.fake_data,
                     bins = bins,
                     weights = self.weights_fake[:,i],
                     density = True
@@ -414,8 +414,9 @@ class Plots:
                 np.quantile(rw_hists, 0.841, axis=1)
             ), axis=0)
         else:
+            print(observable.fake_data.shape, self.weights_fake.shape)
             rw_mean = np.histogram(
-                observable.fake_data[self.fake_mask],
+                observable.fake_data,
                 bins=bins,
                 weights=self.weights_fake
             )[0]
@@ -505,7 +506,7 @@ class Plots:
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         hists = [
             np.histogram(
-                observable.fake_data[self.fake_mask][mask],
+                observable.fake_data[mask],
                 bins=bins,
                 density=True
             )[0]

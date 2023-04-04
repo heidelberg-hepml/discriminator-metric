@@ -1,18 +1,19 @@
-run_name: calo_inn_p2
+run_name: calo_inn_e2
 dtype: float64
-
+p_type: piplus
 
 #Dataset
 loader_module: calo_inn
 loader_params: 
+  p_type: pions      # gammas, eplus, pions
   geant_file: /remote/gpu06/favaro/discriminator-metric/data/calo_cls_geant/full_cls_piplus.hdf5
   generated_file: /remote/gpu06/favaro/discriminator-metric/data/calo_bay_samples/samples_piplus.hdf5
   add_log_energy: True
   add_log_layer_ens: True
   add_logit_step: False
   add_cut: 0.0
-  train_split: 0.6
-  test_split: 0.2
+  train_split: 0.5
+  test_split: 0.3
   
 # Model
 activation: leaky_relu
@@ -38,10 +39,10 @@ checkpoint_interval: 5
 
 # Evaluation
 bayesian_samples: 5
-#lower_cluster_thresholds: [0.01, 0.1]
-#upper_cluster_thresholds: [0.9, 0.99]
+lower_cluster_thresholds: [0.1]
+upper_cluster_thresholds: [2.0]
 
 #Plotting
-w_labels: [ placeh, Truth, Gen.]
+w_labels: [ placeh, Geant, Gen.]
 add_w_comb: False
 
