@@ -113,7 +113,6 @@ def run(epoch, loader, partition):
         res['label'] = torch.cat(res['label']).unsqueeze(-1)
         res['score'] = torch.cat(res['score'])
         length += len(res['label'])
-        print(length)
 
         res['score'] = torch.cat((res['label'],res['score']),dim=-1)
     res['counter'] = sum_reduce(res['counter'], device = device).item()
@@ -132,7 +131,7 @@ def train(res):
             dist.barrier() # wait master to save model
             with torch.no_grad():
                 val_res = run(epoch, dataloaders['val'], partition='val')
-            if (args.local_rank == 1): # only master process save
+            if (args.local_rank == 0): # only master process save
                 res['lr'].append(optimizer.param_groups[0]['lr'])
                 res['train_time'].append(train_res['time'])
                 res['val_time'].append(val_res['time'])
@@ -146,7 +145,7 @@ def train(res):
                            'val_loss': val_res['loss'], 'val_acc': val_res['acc'],
                            'lr': optimizer.param_groups[0]['lr']})
 
-                ## save best model
+                    ## save best model
                 if val_res['acc'] > res['best_val']:
                     print("New best validation model, saving...")
                     torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/best-val-model.pt")
@@ -159,6 +158,13 @@ def train(res):
                 print("Val loss: %.4f \t Val acc: %.4f" % (val_res['loss'], val_res['acc']))
                 print("Best val acc: %.4f at epoch %d." % (res['best_val'],  res['best_epoch']))
 
+            if (args.local_rank == 1):
+                wandb.log({'train_loss': train_res['loss'], 'train_acc': train_res['acc'],
+                           'val_loss': val_res['loss'], 'val_acc': val_res['acc'],
+                           'lr': optimizer.param_groups[0]['lr']})
+
+
+            
                 json_object = json.dumps(res, indent=4)
                 with open(f"{args.logdir}/{args.exp_name}/train-result.json", "w") as outfile:
                     outfile.write(json_object)
@@ -198,17 +204,18 @@ def test(res):
             with open(f"{args.logdir}/{args.exp_name}/test-result_{i}.json", "w") as outfile:
                 outfile.write(json_object)
 
-            wandb.log('full val_loss', test_res['loss'],'full val_acc', test_res['acc'],
+            wandb.log({'full val_loss', test_res['loss'],'full val_acc', test_res['acc'],
                       'full val_auc', auc, 'full val_1/eB_0.3',1./eB[0],
-                      'full val_1/eB_0.5',1./eB[1])
+                      'full val_1/eB_0.5',1./eB[1]})
 
 if __name__ == "__main__":
+
+    wandb.require("service")
     ### initialize args
     args = parser.parse_args()
     args_init(args)
+    print(args)
 
-    wandb.init(project='discr-metric', group='test', config=args)
-    wandb.run.name = args.exp_name
 
     ### set random seed
     torch.manual_seed(args.seed + args.local_rank)
@@ -238,11 +245,15 @@ if __name__ == "__main__":
     ddp_model = DistributedDataParallel(model, device_ids=[args.local_rank])
 
     ### print model and dataset information
-    if (args.local_rank == 1):
+    if (args.local_rank == 0):
         pytorch_total_params = sum(p.numel() for p in ddp_model.parameters())
         print("Network Size:", pytorch_total_params)
         for (split, dataloader) in dataloaders.items():
             print(f" {split} samples: {len(dataloader.dataset)}")
+
+
+    wandb.init(project="discr-metric", group=f'test', config=args)
+    wandb.run.name = f'{args.exp_name}_{args.local_rank}'
 
     ### optimizer
     optimizer = optim.AdamW(ddp_model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
