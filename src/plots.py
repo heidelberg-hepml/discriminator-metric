@@ -349,30 +349,86 @@ class Plots:
         """
         assert self.log_gen_weights is not None
 
-        w_bgen = np.std(self.log_gen_weights, axis=1)
-        if self.bayesian:
-            w_bgen = np.repeat(w_bgen[:,None], self.weights_fake.shape[1], axis=1).flatten()
-            w_disc = self.weights_fake.flatten()
-        else:
-            w_disc = self.weights_fake
-        x_bins = np.linspace(0,4,30)
-        y_bins = np.linspace(0,3,30)
+        with PdfPages(file) as pdf:
+            mean_w_bgen = np.mean(np.exp(self.log_gen_weights), axis=1)
+            std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
+            std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
+            if self.bayesian:
+                mean_w_bgen = np.repeat(
+                    mean_w_bgen[:,None], self.weights_fake.shape[1], axis=1
+                ).flatten()
+                std_w_bgen = np.repeat(
+                    std_w_bgen[:,None], self.weights_fake.shape[1], axis=1
+                ).flatten()
+                std_log_w_bgen = np.repeat(
+                    std_log_w_bgen[:,None], self.weights_fake.shape[1], axis=1
+                ).flatten()
+                w_disc = self.weights_fake.flatten()
+            else:
+                w_disc = self.weights_fake
+            x_bins = np.linspace(0,4,30)
+            y_bins = np.linspace(0,3,30)
 
-        fig, ax = plt.subplots(figsize=(4,3.5))
-        ax.hist2d(
-            w_bgen,
-            w_disc,
-            bins=(x_bins, y_bins),
-            rasterized=True,
-            norm = mpl.colors.LogNorm(),
-            density=True,
-            cmap="jet"
-        )
-        ax.set_xlabel(r"$\sigma(\log w_\text{gen})$")
-        ax.set_ylabel(r"$w_\text{disc}$")
+            fig, ax = plt.subplots(figsize=(4,3.5))
+            ax.hist2d(
+                std_log_w_bgen,
+                w_disc,
+                bins=(x_bins, y_bins),
+                rasterized=True,
+                norm = mpl.colors.LogNorm(),
+                density=True,
+                cmap="jet"
+            )
+            ax.set_xlabel(r"$\sigma(\log p_\text{gen})$")
+            ax.set_ylabel(r"$w_\text{disc}$")
 
-        plt.savefig(file, bbox_inches="tight")
-        plt.close()
+            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.close()
+
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            pull = mean_w_bgen * (w_disc - 1) / std_w_bgen
+            low_lim = np.quantile(pull[np.isfinite(pull)], 0.0001)
+            high_lim = np.quantile(pull[np.isfinite(pull)], 0.9999)
+            lim = max(high_lim, -low_lim)
+            bins = np.linspace(-lim, lim, 40)
+            y, _ = np.histogram(pull, bins, density=True)
+            self.hist_line(
+                ax,
+                bins,
+                y,
+                y_err = None,
+                label = "Gen",
+                color = self.colors[0]
+            )
+            ax.set_xlabel(r"$\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen})$")
+            ax.set_ylabel("normalized")
+            ax.set_yscale("log")
+            ax.set_xlim(bins[0], bins[-1])
+            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.close()
+
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            log_pull = np.log(w_disc) / std_log_w_bgen
+            bins = np.linspace(
+                np.quantile(log_pull[np.isfinite(log_pull)], 0.0001),
+                np.quantile(log_pull[np.isfinite(log_pull)], 0.9999),
+                40
+            )
+            y, _ = np.histogram(log_pull, bins, density=True)
+            self.hist_line(
+                ax,
+                bins,
+                y,
+                y_err = None,
+                label = "Gen",
+                color = self.colors[0]
+            )
+            ax.set_xlabel(r"$\log w_\text{disc} / \sigma(\log p_\text{gen})$")
+            ax.set_ylabel("normalized")
+            ax.set_yscale("log")
+            ax.set_xlim(bins[0], bins[-1])
+            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.close()
 
 
     def plot_observables(self, file: str):
