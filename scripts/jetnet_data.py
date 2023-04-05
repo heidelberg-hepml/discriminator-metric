@@ -88,9 +88,9 @@ for s in new_split:
 
 # store data in hdf5 file    
 for s in new_split:
-      new_jet_data[s]['data'].to_hdf('data/jetnet_data_1.h5', key=f'jet_data_{s}', mode='a',format='table')  
-      new_particle_data[s]['data'].to_hdf('data/jetnet_data_1.h5', key=f'particle_data_{s}', mode='a',format='table')
-      new_jet_data[s]['labels'].to_hdf('data/jetnet_data_1.h5', key=f'labels_{s}', mode='a',format = 'table')
+      new_jet_data[s]['data'].to_hdf('data/jetnet_data.h5', key=f'jet_data_{s}', mode='a',format='table')  
+      new_particle_data[s]['data'].to_hdf('data/jetnet_data.h5', key=f'particle_data_{s}', mode='a',format='table')
+      new_jet_data[s]['labels'].to_hdf('data/jetnet_data.h5', key=f'labels_{s}', mode='a',format = 'table')
 
 
 
