@@ -210,7 +210,7 @@ class Plots:
             )
             self.plot_single_weight_hist(
                 pdf,
-                bins=np.logspace(np.log10(self.p_low-self.eps), np.log10(self.p_high+self.eps), 50),
+                bins=np.logspace(np.log10(self.p_low)-1e-5, np.log10(self.p_high)+1e-5, 50),
                 xscale="symlog",
                 yscale="log",
                 secax=False,
@@ -414,7 +414,6 @@ class Plots:
                 np.quantile(rw_hists, 0.841, axis=1)
             ), axis=0)
         else:
-            print(observable.fake_data.shape, self.weights_fake.shape)
             rw_mean = np.histogram(
                 observable.fake_data,
                 bins=bins,
