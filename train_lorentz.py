@@ -204,9 +204,10 @@ def test(res):
             with open(f"{args.logdir}/{args.exp_name}/test-result_{i}.json", "w") as outfile:
                 outfile.write(json_object)
 
-            wandb.log({'full val_loss', test_res['loss'],'full val_acc', test_res['acc'],
-                      'full val_auc', auc, 'full val_1/eB_0.3',1./eB[0],
-                      'full val_1/eB_0.5',1./eB[1]})
+            wandb.log({'full val_loss': test_res['loss'],'full val_acc': test_res['acc'],
+                      'full val_auc': auc, 'full val_1/eB_0.3': 1./eB[0],
+                      'full val_1/eB_0.5': 1./eB[1],
+                      'epochs': i})
 
 if __name__ == "__main__":
 
@@ -252,7 +253,7 @@ if __name__ == "__main__":
             print(f" {split} samples: {len(dataloader.dataset)}")
 
 
-    wandb.init(project="discr-metric", group=f'test', config=args)
+    wandb.init(project="discr-metric", group=f'remove_tail_distribution', config=args)
     wandb.run.name = f'{args.exp_name}_{args.local_rank}'
 
     ### optimizer
@@ -281,3 +282,5 @@ if __name__ == "__main__":
     else:
         ### only test on best model
         test(res)
+        wandb.finish()
+
