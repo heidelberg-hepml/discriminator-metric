@@ -132,10 +132,11 @@ class Plots:
             ax.plot(epochs, curve, label=label)
         ax.set_xlabel("epoch")
         ax.set_ylabel(ylabel)
-        self.corner_text(ax, self.title, "right", "top")
         ax.set_yscale(yscale)
         if any(label is not None for label in labels):
-            ax.legend(loc="center right", frameon=False)
+            ax.legend(loc="best", frameon=False, title=self.title)
+        else:
+            self.corner_text(ax, self.title, "right", "top")
         plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 
@@ -309,7 +310,7 @@ class Plots:
             label = self.labels_w_hist[2],
             color = self.colors[2]
         )
-        self.corner_text(ax, self.title, "right", "top")
+        #self.corner_text(ax, self.title, "right", "top")
         ax.set_xlabel("$w(x)$")
         ax.set_ylabel("a.u.")
         if xscale == 'symlog':
@@ -333,7 +334,7 @@ class Plots:
         
         if yscale == "linear":
             ax.set_ylim(bottom=0)
-        ax.legend(frameon=False)
+        ax.legend(frameon=False, title=self.title)
         plt.savefig(pdf, format="pdf", bbox_inches="tight")
         plt.close()
 
@@ -621,10 +622,10 @@ class Plots:
                     ratio[ratio_isnan] = 1.
                     self.hist_line(ax, bins, ratio, ratio_err, label=None, color=line.color)
 
-            axs[0].legend(frameon=False)
+            axs[0].legend(frameon=False, title=self.title)
             axs[0].set_ylabel("normalized")
             axs[0].set_yscale(observable.yscale)
-            self.corner_text(axs[0], self.title, "right", "top")
+            #self.corner_text(axs[0], self.title, "right", "top")
 
             if show_ratios:
                 axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
