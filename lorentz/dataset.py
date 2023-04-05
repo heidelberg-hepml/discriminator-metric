@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix
 from torch.utils.data import TensorDataset, DataLoader
 from sklearn.preprocessing import OneHotEncoder
 from torch.utils.data.distributed import DistributedSampler
+import pandas as pd
 
 def get_adj_matrix(n_nodes, batch_size, edge_mask):
     rows, cols = [], []
@@ -33,36 +34,28 @@ def collate_fn(data):
 def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_dir = './data', num_workers=4):
     #raw = energyflow.qg_jets.load(num_data=num_data, pad=True, ncol=4, generator='pythia',
                    #         with_bc=False, cache_dir=cache_dir)
-    splits = ['train', 'val', 'test']
+    splits = ['train', 'val']
     data = {type:{'raw':None,'label':None} for type in splits}
-  #  (data['train']['raw'],  data['val']['raw'],   data['test']['raw'],
-  #  data['train']['label'], data['val']['label'], data['test']['label']) = \
-    #    energyflow.utils.data_split(*raw, train=0.8, val=0.1, test=0.1, shuffle = False)
-    data['train']['raw']=np.load('/home/rd804/qg/data/X_train_padded.npy')
-    data['val']['raw']=np.load('/home/rd804/qg/data/X_val_padded.npy')
-    data['test']['raw']=np.load('/home/rd804/qg/data/X_test_padded.npy')
+  
+    for s in splits:
+        data[s]['raw'] = pd.read_hdf('data/jetnet_data.h5', f'particle_data_{s}').values.reshape(-1,150,4)
+        data[s]['label'] = pd.read_hdf('data/jetnet_data.h5', f'labels_{s}')['labels']
+
     
-    data['train']['label']=np.load('/home/rd804/qg/data/y_train.npy')
-    data['val']['label']=np.load('/home/rd804/qg/data/y_val.npy')
-    data['test']['label'] =np.load('/home/rd804/qg/data/y_test.npy')
   #  enc = OneHotEncoder(handle_unknown='ignore').fit([[11],[13],[22],[130],[211],[321],[2112],[2212]])
     #print(data)    
     for split, value in data.items():
-        pid = torch.from_numpy(np.abs(np.asarray(value['raw'][...,3], dtype=int))).unsqueeze(-1)
-        p4s = torch.from_numpy(energyflow.p4s_from_ptyphipids(value['raw'],error_on_unknown=True))
-      #  one_hot = enc.transform(pid.reshape(-1,1)).toarray().reshape(pid.shape[:2]+(-1,))
-       # one_hot = torch.from_numpy(one_hot)
+
+        p4s = value['raw']
+      
         mass = torch.from_numpy(energyflow.ms_from_p4s(p4s)).unsqueeze(-1)
-        #charge = torch.from_numpy(energyflow.pids2chrgs(pid))
-        #if use_one_hot:
-         #   nodes = one_hot
-        #else:
-         #   nodes = torch.cat((mass,charge),dim=-1)
+
         nodes = mass
         nodes = torch.sign(nodes) * torch.log(torch.abs(nodes) + 1)
         
           #  nodes = torch.sign(nodes) * torch.log(torch.abs(nodes) + 1)
-        atom_mask = (pid[...,0] != 0)
+        atom_mask = atom_mask = torch.tensor((value['raw']!=[0,0,0,0])[...,0]) 
+
         value['p4s'] = p4s
         value['nodes'] = nodes
         value['label'] = torch.from_numpy(value['label'])
