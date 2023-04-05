@@ -81,7 +81,7 @@ def run(epoch, loader, partition):
         if partition == 'train':
             loss.backward()
             optimizer.step()
-        elif partition == 'test':
+        elif partition == 'val':
             # save labels and probilities for ROC / AUC
             score = torch.nn.functional.softmax(pred, dim = -1)
             res['label'].append(label)
@@ -107,7 +107,7 @@ def run(epoch, loader, partition):
 
     torch.cuda.empty_cache()
     # ---------- reduce -----------
-    if partition == 'test':
+    if partition == 'val':
         res['label'] = torch.cat(res['label']).unsqueeze(-1)
         res['score'] = torch.cat(res['score'])
         res['score'] = torch.cat((res['label'],res['score']),dim=-1)
@@ -247,7 +247,7 @@ if __name__ == "__main__":
     if not args.test_mode:
         ### training and testing
         train(res)
-        test(res)
+      #  test(res)
     else:
         ### only test on best model
         test(res)

@@ -39,14 +39,15 @@ def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_di
   
     for s in splits:
         data[s]['raw'] = pd.read_hdf('data/jetnet_data.h5', f'particle_data_{s}').values.reshape(-1,150,4)
-        data[s]['label'] = pd.read_hdf('data/jetnet_data.h5', f'labels_{s}')['labels']
+        data[s]['label'] = pd.read_hdf('data/jetnet_data.h5', f'labels_{s}')['labels'].values
 
-    
+   # print(len(data['train']['label']))
+   # print(len(data['train']['raw']))
   #  enc = OneHotEncoder(handle_unknown='ignore').fit([[11],[13],[22],[130],[211],[321],[2112],[2212]])
     #print(data)    
     for split, value in data.items():
 
-        p4s = value['raw']
+        p4s = torch.from_numpy(value['raw'])
       
         mass = torch.from_numpy(energyflow.ms_from_p4s(p4s)).unsqueeze(-1)
 
