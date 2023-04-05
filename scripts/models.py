@@ -113,6 +113,7 @@ class LorentzNet(nn.Module):
         h = h.view(-1, n_nodes, self.n_hidden)
         h = torch.mean(h, dim=1)
         pred = self.graph_dec(h)
+      
         return pred.squeeze(1)
 
 

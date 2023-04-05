@@ -8,6 +8,7 @@ import numpy as np
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+import wandb
 
 parser = argparse.ArgumentParser(description='JetNet mis-model training')
 parser.add_argument('--exp_name', type=str, default='', metavar='N',
@@ -57,6 +58,7 @@ def run(epoch, loader, partition):
     res = {'time':0, 'correct':0, 'loss': 0, 'counter': 0, 'acc': 0,
            'loss_arr':[], 'correct_arr':[],'label':[],'score':[]}
 
+    length = 0
     tik = time.time()
     loader_length = len(loader)
 
@@ -81,7 +83,7 @@ def run(epoch, loader, partition):
         if partition == 'train':
             loss.backward()
             optimizer.step()
-        elif partition == 'val':
+        elif partition == 'test':
             # save labels and probilities for ROC / AUC
             score = torch.nn.functional.softmax(pred, dim = -1)
             res['label'].append(label)
@@ -107,9 +109,12 @@ def run(epoch, loader, partition):
 
     torch.cuda.empty_cache()
     # ---------- reduce -----------
-    if partition == 'val':
+    if partition == 'test':
         res['label'] = torch.cat(res['label']).unsqueeze(-1)
         res['score'] = torch.cat(res['score'])
+        length += len(res['label'])
+        print(length)
+
         res['score'] = torch.cat((res['label'],res['score']),dim=-1)
     res['counter'] = sum_reduce(res['counter'], device = device).item()
     res['loss'] = sum_reduce(res['loss'], device = device).item() / res['counter']
@@ -136,6 +141,10 @@ def train(res):
                 res['val_loss'].append(val_res['loss'])
                 res['val_acc'].append(val_res['acc'])
                 res['epochs'].append(epoch)
+
+                wandb.log({'train_loss': train_res['loss'], 'train_acc': train_res['acc'],
+                           'val_loss': val_res['loss'], 'val_acc': val_res['acc'],
+                           'lr': optimizer.param_groups[0]['lr']})
 
                 ## save best model
                 if val_res['acc'] > res['best_val']:
@@ -165,33 +174,41 @@ def train(res):
 
 def test(res):
     ### test on best model
-    best_model = torch.load(f"{args.logdir}/{args.exp_name}/best-val-model.pt", map_location=device)
-    ddp_model.load_state_dict(best_model)
-    with torch.no_grad():
-        test_res = run(0, dataloaders['test'], partition='test')
+    for i in range(args.epochs):
+        epoch_model = torch.load(f"{args.logdir}/{args.exp_name}/checkpoint-epoch-{i}.pt", map_location=device)
+        ddp_model.load_state_dict(epoch_model)
+        with torch.no_grad():
+            test_res = run(0, dataloaders['val'], partition='test')
 
-    pred = [torch.zeros_like(test_res['score']) for _ in range(dist.get_world_size())]
-    dist.all_gather(pred, test_res['score'] )
-    pred = torch.cat(pred).cpu()
+        pred = [torch.zeros_like(test_res['score']) for _ in range(dist.get_world_size())]
+        dist.all_gather(pred, test_res['score'] )
+        pred = torch.cat(pred).cpu()
+        print(pred.shape)
+        if (args.local_rank == 0):
+            np.save(f"{args.logdir}/{args.exp_name}/score_{i}.npy",pred)
+            fpr, tpr, thres, eB, eS  = buildROC(pred[...,0], pred[...,2])
+            auc = roc_auc_score(pred[...,0], pred[...,2])
 
-    if (args.local_rank == 0):
-        np.save(f"{args.logdir}/{args.exp_name}/score.npy",pred)
-        fpr, tpr, thres, eB, eS  = buildROC(pred[...,0], pred[...,2])
-        auc = roc_auc_score(pred[...,0], pred[...,2])
+            metric = {'test_loss': test_res['loss'], 'test_acc': test_res['acc'],
+                      'test_auc': auc, 'test_1/eB_0.3':1./eB[0],'test_1/eB_0.5':1./eB[1]}
+            res.update(metric)
+            print("Test: Loss %.4f \t Acc %.4f \t AUC: %.4f \t 1/eB 0.3: %.4f \t 1/eB 0.5: %.4f"
+                   % (test_res['loss'], test_res['acc'], auc, 1./eB[0], 1./eB[1]))
+            json_object = json.dumps(res, indent=4)
+            with open(f"{args.logdir}/{args.exp_name}/test-result_{i}.json", "w") as outfile:
+                outfile.write(json_object)
 
-        metric = {'test_loss': test_res['loss'], 'test_acc': test_res['acc'],
-                  'test_auc': auc, 'test_1/eB_0.3':1./eB[0],'test_1/eB_0.5':1./eB[1]}
-        res.update(metric)
-        print("Test: Loss %.4f \t Acc %.4f \t AUC: %.4f \t 1/eB 0.3: %.4f \t 1/eB 0.5: %.4f"
-               % (test_res['loss'], test_res['acc'], auc, 1./eB[0], 1./eB[1]))
-        json_object = json.dumps(res, indent=4)
-        with open(f"{args.logdir}/{args.exp_name}/test-result.json", "w") as outfile:
-            outfile.write(json_object)
+            wandb.log('full val_loss', test_res['loss'],'full val_acc', test_res['acc'],
+                      'full val_auc', auc, 'full val_1/eB_0.3',1./eB[0],
+                      'full val_1/eB_0.5',1./eB[1])
 
 if __name__ == "__main__":
     ### initialize args
     args = parser.parse_args()
     args_init(args)
+
+    wandb.init(project='discr-metric', group='test', config=args)
+    wandb.run.name = args.exp_name
 
     ### set random seed
     torch.manual_seed(args.seed + args.local_rank)
@@ -247,7 +264,9 @@ if __name__ == "__main__":
     if not args.test_mode:
         ### training and testing
         train(res)
-      #  test(res)
+        test(res)
+
+        wandb.finish()
     else:
         ### only test on best model
         test(res)
