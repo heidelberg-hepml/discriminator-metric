@@ -1,5 +1,5 @@
 from lorentz import dataset
-from scripts.models import LorentzNet
+from scripts.lorentznet_models import LorentzNet
 import torch
 from torch import nn, optim
 import argparse, json, time
