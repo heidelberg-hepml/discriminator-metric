@@ -16,7 +16,7 @@ class ParticleNetDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.particle_data)
+        return len(self.label)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):

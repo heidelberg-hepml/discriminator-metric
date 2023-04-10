@@ -30,9 +30,9 @@ class _ParticleNetEdgeNet(nn.Module):
         return "{}(nn={})".format(self.__class__.__name__, self.model)
 
 
-class _ParticleNet(nn.Module):
+class ParticleNet(nn.Module):
     def __init__(self, num_hits, node_feat_size, num_classes=2):
-        super(_ParticleNet, self).__init__()
+        super(ParticleNet, self).__init__()
         self.num_hits = num_hits
         self.node_feat_size = node_feat_size
         self.num_classes = num_classes
