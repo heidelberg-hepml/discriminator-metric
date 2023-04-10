@@ -6,7 +6,7 @@ from sklearn.utils import shuffle
 from sklearn.model_selection import train_test_split
 import pandas as pd
 import h5py
-from conversion import *
+from scripts.conversion import *
 
 # Download JetNet data
 split = ['train', 'valid', 'test']
