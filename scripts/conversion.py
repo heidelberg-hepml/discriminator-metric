@@ -3,6 +3,55 @@ import numpy as np
 import pandas as pd
 
 
+def create_pnet_inputs(jets,jet_data, all_coords=True):
+    eps = 1e-32
+    """ Creates the input for the PNet model
+    """
+    eta_rel = jets[...,0]
+    phi_rel = jets[...,1]
+    pt_rel = jets[...,2]
+
+    eta_jet = jet_data['eta'].values.reshape(-1,1)
+    pt_jet = jet_data['pt'].values.reshape(-1,1)
+
+
+
+
+    if all_coords:
+        pnet_inputs = jets.copy()
+
+        log_particle_pt = np.log(pt_rel * pt_jet+eps)
+        assert log_particle_pt.shape == pt_rel.shape
+
+        log_pt_rel = np.log(pt_rel+eps)
+
+        delta_R = np.sqrt(eta_rel**2 + phi_rel**2)
+
+        epxpypz = etaphipt_rel_to_epxpypz(jets,jet_data)
+        e = epxpypz[...,0]
+        print(np.min(e))
+        print(np.min(pt_rel))
+        assert e.shape == pt_rel.shape
+        jet_e = np.sum(e,axis=1).reshape(-1,1)
+        assert jet_e.shape == (len(jet_data),1)
+
+        log_e = np.log(e+eps)
+        log_rel_e = np.log(e/jet_e+eps)
+
+        pnet_inputs = np.dstack((pnet_inputs[...,0],pnet_inputs[...,1],log_pt_rel,\
+                                 log_particle_pt,delta_R,log_e,log_rel_e))
+        assert pnet_inputs.shape[-1] == 7
+        assert np.all(pnet_inputs[...,0:2] == jets[...,0:2])==True
+
+        return pnet_inputs
+
+    else:
+        pnet_inputs = jets.copy()
+    
+    return pnet_inputs
+
+
+
 def polar_rel_to_polar(jets,jet_data):
 
     """Converts relative polar coordinates to absolute polar coordinates
