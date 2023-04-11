@@ -5,6 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.stats import lognorm, norm
+from scipy.optimize import curve_fit
 
 from .observable import Observable
 
@@ -61,8 +63,8 @@ class Plots:
 
     def process_weights(self, weights_true, weights_fake):
         w_comb = np.concatenate((weights_true, weights_fake), axis=0)
-        self.p_low = np.percentile(w_comb[w_comb!=0], 0.1)
-        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.9)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0.05)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.95)
 
         weights_true[weights_true >= self.p_high] = self.p_high
         weights_fake[weights_fake <= self.p_low] = self.p_low
@@ -369,8 +371,8 @@ class Plots:
             x_bins = np.linspace(0,4,30)
             y_bins = np.linspace(0,3,30)
 
-            fig, ax = plt.subplots(figsize=(4,3.5))
-            ax.hist2d(
+            fig, ax = plt.subplots(figsize=(4.5,4.0))
+            _, _, _, img = ax.hist2d(
                 std_log_w_bgen,
                 w_disc,
                 bins=(x_bins, y_bins),
@@ -379,6 +381,8 @@ class Plots:
                 density=True,
                 cmap="jet"
             )
+            cb = plt.colorbar(img)
+            cb.set_label('norm.')
             ax.set_xlabel(r"$\sigma(\log p_\text{gen})$")
             ax.set_ylabel(r"$w_\text{disc}$")
 
@@ -389,8 +393,8 @@ class Plots:
             pull = mean_w_bgen * (w_disc - 1) / std_w_bgen
             low_lim = np.quantile(pull[np.isfinite(pull)], 0.0001)
             high_lim = np.quantile(pull[np.isfinite(pull)], 0.9999)
-            lim = max(high_lim, -low_lim)
-            bins = np.linspace(-lim, lim, 40)
+            #lim = max(high_lim, -low_lim)
+            bins = np.linspace(low_lim, high_lim, 50)
             y, _ = np.histogram(pull, bins, density=True)
             self.hist_line(
                 ax,
@@ -400,10 +404,14 @@ class Plots:
                 label = "Gen",
                 color = self.colors[0]
             )
-            ax.set_xlabel(r"$\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen})$")
+            x_fit, bins_fit, norm_param = self.fit_norm(bins, y, p0=(y.mean(), y.var()))
+            ax.plot(bins_fit, x_fit, label=r"$\mu={:.3f}$ $\sigma={:.3f}$".format(norm_param[0], norm_param[1]))
+            ax.set_xlabel(r"$(\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen}))$")
             ax.set_ylabel("normalized")
-            ax.set_yscale("log")
+            #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
+            ax.legend(loc='upper left')
+            #ax.set_ylim(top=2.0e1, bottom=1.0e-4)
             plt.savefig(pdf, format="pdf", bbox_inches="tight")
             plt.close()
 
@@ -412,7 +420,7 @@ class Plots:
             bins = np.linspace(
                 np.quantile(log_pull[np.isfinite(log_pull)], 0.0001),
                 np.quantile(log_pull[np.isfinite(log_pull)], 0.9999),
-                40
+                50
             )
             y, _ = np.histogram(log_pull, bins, density=True)
             self.hist_line(
@@ -420,16 +428,27 @@ class Plots:
                 bins,
                 y,
                 y_err = None,
-                label = "Gen",
+                label = "Pull",
                 color = self.colors[0]
             )
+            x_fit, bins_fit, norm_param = self.fit_norm(bins, y, p0=(y.mean(), y.var()))
+
+            ax.plot(bins_fit, x_fit, label=r"$\mu={:.3f}$ ""\n"" $\sigma={:.3f}$".format(norm_param[0], norm_param[1]), color='red')
             ax.set_xlabel(r"$\log w_\text{disc} / \sigma(\log p_\text{gen})$")
             ax.set_ylabel("normalized")
-            ax.set_yscale("log")
+            #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
+            #ax.set_ylim(bottom=1.0e-2, top=y.max()+5)
+            ax.legend(loc='upper left')
             plt.savefig(pdf, format="pdf", bbox_inches="tight")
             plt.close()
 
+    def fit_norm(self, bins, y, p0, points=1000):
+        to_fit = norm.pdf
+        param, cov = curve_fit(to_fit, bins[:-1], y, p0=p0)
+        bins_fit = np.linspace(bins[0], bins[-1], points)
+        pred = norm.pdf(bins_fit, loc=param[0], scale=param[1])
+        return pred, bins_fit, param
 
     def plot_observables(self, file: str):
         """
