@@ -16,8 +16,7 @@ jet_data = {}
 for s in split:
     particle_data[s], jet_data[s] = JetNet.getData(jet_type=["g"], data_dir="data/",
                                              jet_features=["pt", "eta", "mass",
-                                                           "num_particles"],split=s,
-                                                           num_particles=150)
+                                                           "num_particles"],split=s)
     print(f'{s} particle_data.shape = ', particle_data[s].shape, 
           f'{s} jet_data.shape = ', jet_data[s].shape)
 
@@ -76,7 +75,7 @@ for s in new_split:
       # shuffle data
       jet_data_new, particle_data_new, labels = shuffle(jet_data_new, particle_data_new, labels, random_state=42)
 
-      new_particle_data[s]['data'] = pd.DataFrame(particle_data_new.reshape(-1,150*7))
+      new_particle_data[s]['data'] = pd.DataFrame(particle_data_new.reshape(-1,30*7))
       #new_particle_data[s]['labels'] = labels
       
       new_jet_data[s]['data'] = pd.DataFrame(jet_data_new,columns=['pt','eta','mass','num_particles'])

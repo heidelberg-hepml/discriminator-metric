@@ -65,7 +65,7 @@ class ParticleNet(nn.Module):
 
         self.fc2 = nn.Linear(self.fc_size, self.num_classes)
 
-    def forward(self, x, ret_activations=False, relu_activations=False):
+    def forward(self, x, mask,ret_activations=False, relu_activations=False):
         batch_size = x.size(0)
         x = x.reshape(batch_size * self.num_hits, self.node_feat_size)
         zeros = torch.zeros(batch_size * self.num_hits, dtype=int).to(x.device)

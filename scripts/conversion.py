@@ -10,6 +10,7 @@ def create_pnet_inputs(jets,jet_data, all_coords=True):
     eta_rel = jets[...,0]
     phi_rel = jets[...,1]
     pt_rel = jets[...,2]
+    mask = jets[...,3]
 
     eta_jet = jet_data['eta'].values.reshape(-1,1)
     pt_jet = jet_data['pt'].values.reshape(-1,1)
@@ -39,10 +40,10 @@ def create_pnet_inputs(jets,jet_data, all_coords=True):
         log_rel_e = np.log(e/jet_e+eps)
 
         pnet_inputs = np.dstack((pnet_inputs[...,0],pnet_inputs[...,1],log_pt_rel,\
-                                 log_particle_pt,delta_R,log_e,log_rel_e))
-        assert pnet_inputs.shape[-1] == 7
+                                 log_particle_pt,delta_R,log_e,log_rel_e,pnet_inputs[...,1]))
+        assert pnet_inputs.shape[-1] == 8
         assert np.all(pnet_inputs[...,0:2] == jets[...,0:2])==True
-
+        print(pnet_inputs[...,7])
         return pnet_inputs
 
     else:
@@ -56,6 +57,8 @@ def polar_rel_to_polar(jets,jet_data):
 
     """Converts relative polar coordinates to absolute polar coordinates
     """
+    polar_jet  = jets.copy()
+
     eta_rel = jets[...,0]
     pt_rel = jets[...,2]
 
@@ -67,7 +70,6 @@ def polar_rel_to_polar(jets,jet_data):
 
 
 
-    polar_jet  = jets.copy()
 
     polar_jet[...,0] = eta
     polar_jet[...,2] = pt
