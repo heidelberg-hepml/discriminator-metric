@@ -11,7 +11,11 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 import wandb
 
 parser = argparse.ArgumentParser(description='JetNet mis-model training')
-parser.add_argument('--exp_name', type=str, default='', metavar='N',
+parser.add_argument('--wandb_project', default='discr-metric', help='Wandb project name [default: discr-metric]')
+parser.add_argument('--wandb_group', default='test_lorentznet', help='Wandb group name [default: test_particlenet]')
+parser.add_argument('--wandb_job_type', default='lorentznet', help='Wandb job type [default: train]')
+
+parser.add_argument('--exp_name', type=str, default='test_lorentznet', metavar='N',
                     help='experiment_name')
 parser.add_argument('--test_mode', action='store_true', default=False,
                     help = 'test best model')
@@ -253,7 +257,11 @@ if __name__ == "__main__":
             print(f" {split} samples: {len(dataloader.dataset)}")
 
 
-    wandb.init(project="discr-metric", group=f'remove_tail_distribution', config=args)
+    wandb.init(project=args.wandb_project, 
+          group=args.wandb_group,
+          #group='remove_tail_distribution', 
+          job_type=args.wandb_job_type, config=args)
+    
     wandb.run.name = f'{args.exp_name}_{args.local_rank}'
 
     ### optimizer

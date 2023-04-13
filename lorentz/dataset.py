@@ -38,17 +38,12 @@ def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_di
     data = {type:{'raw':None,'label':None} for type in splits}
   
     for s in splits:
-        data[s]['raw'] = pd.read_hdf('data/jetnet_data.h5', f'particle_data_{s}').values.reshape(-1,150,4)
-        data[s]['label'] = pd.read_hdf('data/jetnet_data.h5', f'labels_{s}')['labels'].values
-
-   # print(len(data['train']['label']))
-   # print(len(data['train']['raw']))
-  #  enc = OneHotEncoder(handle_unknown='ignore').fit([[11],[13],[22],[130],[211],[321],[2112],[2212]])
-    #print(data)    
+        data[s]['raw'] = pd.read_hdf('data/jetnet30_data.h5', f'particle_data_{s}').values.reshape(-1,30,4)
+        data[s]['label'] = pd.read_hdf('data/jetnet30_data.h5', f'labels_{s}')['labels'].values
+ 
     for split, value in data.items():
 
-        p4s = torch.from_numpy(value['raw'])
-      
+        p4s = torch.from_numpy(value['raw'])  
         mass = torch.from_numpy(energyflow.ms_from_p4s(p4s)).unsqueeze(-1)
 
         nodes = mass
@@ -69,7 +64,6 @@ def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_di
     # distributed training
     train_sampler = DistributedSampler(datasets['train'], shuffle=True)
     # Construct PyTorch dataloaders from datasets
-   # train_sampler = None
     dataloaders = {split: DataLoader(dataset,
                                      batch_size=batch_size if (split == 'train') else batch_size,
                                      sampler=train_sampler if (split == 'train') else DistributedSampler(dataset, shuffle=False),pin_memory=True,
