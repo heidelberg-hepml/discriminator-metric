@@ -50,6 +50,6 @@ for split in splits:
 
     print(_X_df.shape, _y_df.shape)
 
-    _X_df.to_hdf('data/jetnet30_data.h5', key=f'jet_data_{split}', mode='a',format='table')  
+    _X_df.to_hdf('data/jetnet30_data.h5', key=f'particle_data_{split}', mode='a',format='table')  
     _y_df['labels'].to_hdf('data/jetnet30_data.h5', key=f'labels_{split}', mode='a',format = 'table')
 
