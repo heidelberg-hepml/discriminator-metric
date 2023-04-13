@@ -134,7 +134,7 @@ def train(res):
                 torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/checkpoint-epoch-{epoch}.pt")
             dist.barrier() # wait master to save model
             with torch.no_grad():
-                val_res = run(epoch, dataloaders['val'], partition='val')
+                val_res = run(epoch, dataloaders['valid'], partition='val')
             if (args.local_rank == 0): # only master process save
                 res['lr'].append(optimizer.param_groups[0]['lr'])
                 res['train_time'].append(train_res['time'])
@@ -188,7 +188,7 @@ def test(res):
         epoch_model = torch.load(f"{args.logdir}/{args.exp_name}/checkpoint-epoch-{i}.pt", map_location=device)
         ddp_model.load_state_dict(epoch_model)
         with torch.no_grad():
-            test_res = run(0, dataloaders['val'], partition='test')
+            test_res = run(0, dataloaders['valid'], partition='test')
 
         pred = [torch.zeros_like(test_res['score']) for _ in range(dist.get_world_size())]
         dist.all_gather(pred, test_res['score'] )

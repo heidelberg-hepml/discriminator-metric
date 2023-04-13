@@ -34,7 +34,7 @@ def collate_fn(data):
 def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_dir = './data', num_workers=4):
     #raw = energyflow.qg_jets.load(num_data=num_data, pad=True, ncol=4, generator='pythia',
                    #         with_bc=False, cache_dir=cache_dir)
-    splits = ['train', 'val']
+    splits = ['train', 'valid']
     data = {type:{'raw':None,'label':None} for type in splits}
   
     for s in splits:
