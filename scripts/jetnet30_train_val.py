@@ -31,8 +31,8 @@ for split in splits:
     truth_jets_cart = etaphipt_rel_to_epxpypz(truth_jets_pf, truth_jets_data)
 
 
-    test_jets_pf = np.load(f"data/distorted_jets/{args.test_jets}_cartesian.npy").astype(np.float32)
-    test_jets_pf = test_jets_pf[:num_train] if split=='train' else test_jets_pf[num_train : num_train + num_test]
+    test_jets_cart = np.load(f"data/distorted_jets/{args.test_jets}_cartesian.npy").astype(np.float32)
+    test_jets_cart = test_jets_cart[:num_train] if split=='train' else test_jets_cart[num_train : num_train + num_test]
     
 
     test_jets_data = pd.read_hdf(f'data/distorted_jets/distorted_jet_data.h5', 
@@ -40,8 +40,8 @@ for split in splits:
 
 
 
-    _X = np.concatenate((truth_jets_pf, test_jets_pf), axis=0)
-    _Y = np.concatenate((np.ones(len(truth_jets_pf)), np.zeros(len(test_jets_pf))), axis=0
+    _X = np.concatenate((truth_jets_cart, test_jets_cart), axis=0)
+    _Y = np.concatenate((np.ones(len(truth_jets_cart)), np.zeros(len(test_jets_cart))), axis=0
     ).astype(int)
 
     _X_df = pd.DataFrame(_X.reshape(-1,30*4))
