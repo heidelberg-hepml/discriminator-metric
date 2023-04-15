@@ -214,10 +214,10 @@ def test(res):
                       'full val_auc': auc, 'full val_1/eB_0.3': 1./eB[0],
                       'full val_1/eB_0.5': 1./eB[1],
                       'epochs': i})
-        if auc > best_auc:
-            best_auc = auc
-            torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/best_auc_model.pt")
-            np.save(f'{args.logdir}/{args.exp_name}/best_model_score.npy', pred[...,2])
+            if auc > best_auc:
+                best_auc = auc
+                torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/best_auc_model.pt")
+                np.save(f'{args.logdir}/{args.exp_name}/best_model_score.npy', pred[...,2])
 
     
     wandb.log({'best_val_auc': best_auc})
