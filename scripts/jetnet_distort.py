@@ -42,20 +42,22 @@ for i in range(5):
     print(i)
     break
 
-distorted_jet_data = truth_jet_data[inds]
+#distorted_jet_data = truth_jet_data[inds]
 # Assert that Raghav's data matches with the data generated here
 assert (distorted_jets[:,:,:3] == tailcut_original).all()
-distorted_jet_data = pd.DataFrame(distorted_jet_data, columns=['pt', 'eta', 'mass', 'num_particles'])
+#distorted_jet_data_df = pd.DataFrame(distorted_jet_data, columns=['pt', 'eta', 'mass', 'num_particles'])
 
 # Use Raghav's script to create training and validation data
-cartesian_jets = etaphipt_rel_to_epxpypz(distorted_jets, distorted_jet_data)
+cartesian_jets = etaphipt_epxpypz(distorted_jets)
+#cartesian_jets = jetnet.utils.relEtaPhiPt_to_cartesian(distorted_jets[:,:,:3]
+ #                                                      ,distorted_jet_data)
 
 # Save the data :
 
 np.save(f'data/distorted_jets/{args.test_jets}.npy', distorted_jets)
 np.save(f'data/distorted_jets/{args.test_jets}_cartesian.npy', cartesian_jets)
-distorted_jet_data.to_hdf(f'data/distorted_jets/distorted_jet_data.h5', 
-                          key=f'{args.test_jets}', mode='w')
+#distorted_jet_data_df.to_hdf(f'data/distorted_jets/distorted_jet_data.h5', 
+ #                         key=f'{args.test_jets}', mode='w')
 
 
 

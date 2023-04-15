@@ -184,6 +184,8 @@ def train(res):
 
 def test(res):
     ### test on best model
+    best_auc = 0
+
     for i in range(args.epochs):
         epoch_model = torch.load(f"{args.logdir}/{args.exp_name}/checkpoint-epoch-{i}.pt", map_location=device)
         ddp_model.load_state_dict(epoch_model)
@@ -198,7 +200,7 @@ def test(res):
             np.save(f"{args.logdir}/{args.exp_name}/score_{i}.npy",pred)
             fpr, tpr, thres, eB, eS  = buildROC(pred[...,0], pred[...,2])
             auc = roc_auc_score(pred[...,0], pred[...,2])
-
+            
             metric = {'test_loss': test_res['loss'], 'test_acc': test_res['acc'],
                       'test_auc': auc, 'test_1/eB_0.3':1./eB[0],'test_1/eB_0.5':1./eB[1]}
             res.update(metric)
@@ -212,6 +214,14 @@ def test(res):
                       'full val_auc': auc, 'full val_1/eB_0.3': 1./eB[0],
                       'full val_1/eB_0.5': 1./eB[1],
                       'epochs': i})
+        if auc > best_auc:
+            best_auc = auc
+            torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/best_auc_model.pt")
+            np.save(f'{args.logdir}/{args.exp_name}/best_model_score.npy', pred[...,2])
+
+    
+    wandb.log({'best_val_auc': best_auc})
+
 
 if __name__ == "__main__":
 
