@@ -192,12 +192,16 @@ def test(res):
         with torch.no_grad():
             test_res = run(0, dataloaders['valid'], partition='test')
 
+        pred_ = all_gather_nd(test_res['score'])
+        print('len pred: ',len(pred_))
+       # print(pred_[0:20])
         pred = [torch.zeros_like(test_res['score']) for _ in range(dist.get_world_size())]
         dist.all_gather(pred, test_res['score'] )
         pred = torch.cat(pred).cpu()
-        print(pred.shape)
         if (args.local_rank == 0):
             np.save(f"{args.logdir}/{args.exp_name}/score_{i}.npy",pred)
+         #   np.save(f"{args.logdir}/{args.exp_name}/score_all_gather_{i}.npy",pred_.cpu().detach().numpy())
+
             fpr, tpr, thres, eB, eS  = buildROC(pred[...,0], pred[...,2])
             auc = roc_auc_score(pred[...,0], pred[...,2])
             
@@ -218,6 +222,9 @@ def test(res):
                 best_auc = auc
                 torch.save(ddp_model.state_dict(), f"{args.logdir}/{args.exp_name}/best_auc_model.pt")
                 np.save(f'{args.logdir}/{args.exp_name}/best_model_score.npy', pred[...,2])
+              #  np.save(f'{args.logdir}/{args.exp_name}/best_model_score_.npy', pred_[...,2])
+
+
 
     
     wandb.log({'best_val_auc': best_auc})

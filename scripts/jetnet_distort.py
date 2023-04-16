@@ -6,6 +6,7 @@ import argparse
 from scripts.conversion import *
 import jetnet
 import numpy as np
+from coffea.lookup_tools.dense_lookup import dense_lookup
 
 parser = argparse.ArgumentParser(description='create data for lorentzNet Training')
 parser.add_argument('--test_jets', type=str, default='tailcut', help='test jet file')
@@ -24,7 +25,7 @@ mass = jetnet.utils.jet_features(truth_jets_pf[:, :, :3])["mass"]
 tailcut_weights = (mass < 0.17).astype(float)
 tailcut_weights /= np.sum(tailcut_weights)
 
-tailcut_original = np.load('data/raghav/tailcut.npy')
+tailcut_original = np.load(f'data/raghav/{args.test_jets}.npy')
 num_samples = 150_000
 
 np.random.seed(4)
