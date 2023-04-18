@@ -14,6 +14,8 @@ parser = argparse.ArgumentParser(description='JetNet mis-model training')
 parser.add_argument('--wandb_project', default='discr-metric', help='Wandb project name [default: discr-metric]')
 parser.add_argument('--wandb_group', default='test_lorentznet', help='Wandb group name [default: test_particlenet]')
 parser.add_argument('--wandb_job_type', default='lorentznet', help='Wandb job type [default: train]')
+parser.add_argument('--test_jet', default='tailcut', help='type of distortion to test',type=str)
+
 
 parser.add_argument('--exp_name', type=str, default='test_lorentznet', metavar='N',
                     help='experiment_name')
@@ -248,10 +250,12 @@ if __name__ == "__main__":
     device = torch.device("cuda:{}".format(args.local_rank))
     dtype = torch.float32
 
+    
     ### load data
     train_sampler, dataloaders = dataset.retrieve_dataloaders(
                                         args.batch_size,
-                                        num_data=-1, # use all data
+                                        num_data=-1,
+                                        test_jet=args.test_jet, # use all data
                                         cache_dir=args.datadir,
                                         num_workers=args.num_workers,
                                         use_one_hot=True)
@@ -301,7 +305,7 @@ if __name__ == "__main__":
     if not args.test_mode:
         ### training and testing
         train(res)
-        test(res)
+       # test(res)
 
         wandb.finish()
     else:

@@ -31,15 +31,15 @@ def collate_fn(data):
     edges = get_adj_matrix(n_nodes, batch_size, edge_mask)
     return data + [edge_mask, edges]
 
-def retrieve_dataloaders(batch_size, num_data = -1, use_one_hot = True, cache_dir = './data', num_workers=4):
+def retrieve_dataloaders(batch_size, num_data = -1, test_jet='tailcut',use_one_hot = True, cache_dir = './data', num_workers=4):
     #raw = energyflow.qg_jets.load(num_data=num_data, pad=True, ncol=4, generator='pythia',
                    #         with_bc=False, cache_dir=cache_dir)
     splits = ['train', 'valid']
     data = {type:{'raw':None,'label':None} for type in splits}
-  
+    print(f'Loading data for jets distortion type: {test_jet}')
     for s in splits:
-        data[s]['raw'] = pd.read_hdf('data/jetnet30_data.h5', f'particle_data_{s}').values.reshape(-1,30,4)
-        data[s]['label'] = pd.read_hdf('data/jetnet30_data.h5', f'labels_{s}')['labels'].values
+        data[s]['raw'] = pd.read_hdf('data/jetnet30_data.h5', f'particle_data_{test_jet}_{s}').values.reshape(-1,30,4)
+        data[s]['label'] = pd.read_hdf('data/jetnet30_data.h5', f'labels__{test_jet}_{s}')['labels'].values
  
     for split, value in data.items():
 
