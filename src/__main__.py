@@ -89,7 +89,7 @@ def main():
             print(f"  Classifier score: {clf_score:.7f}")
 
         print("  Creating plots")
-        lab_def = ["Comb.", "True", "Gen."]
+        lab_def = ["Comb", "Truth", "Gen"]
         labels = params.get('w_labels', lab_def)
         add_comb = params.get('add_w_comb', True)
         plots = Plots(

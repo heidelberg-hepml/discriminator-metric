@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
-from scipy.stats import lognorm, norm
+from scipy.stats import lognorm, norm, binned_statistic
 from scipy.optimize import curve_fit
 
 from .observable import Observable
@@ -63,8 +63,8 @@ class Plots:
 
     def process_weights(self, weights_true, weights_fake):
         w_comb = np.concatenate((weights_true, weights_fake), axis=0)
-        self.p_low = np.percentile(w_comb[w_comb!=0], 0.05)
-        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.95)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0.01)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.99)
 
         weights_true[weights_true >= self.p_high] = self.p_high
         weights_fake[weights_fake <= self.p_low] = self.p_low
@@ -139,7 +139,7 @@ class Plots:
             ax.legend(loc="best", frameon=False, title=self.title)
         else:
             self.corner_text(ax, self.title, "right", "top")
-        plt.savefig(pdf, format="pdf", bbox_inches="tight")
+        plt.savefig(pdf, format="pdf")
         plt.close()
 
 
@@ -169,6 +169,7 @@ class Plots:
         auc = np.trapz(x=fpr, y=tpr, axis=0)
 
         fig, ax = plt.subplots(figsize=(4,3.5))
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
         if self.bayesian:
             for i in range(self.weights_fake.shape[1]):
                 ax.plot(fpr[:,i], tpr[:,i], alpha=0.3, color=self.colors[0])
@@ -186,7 +187,7 @@ class Plots:
             "top"
         )
         self.corner_text(ax, self.title, "right", "bottom")
-        plt.savefig(file, bbox_inches="tight")
+        plt.savefig(file)
         plt.close()
 
 
@@ -209,7 +210,7 @@ class Plots:
                 bins=np.linspace(0, 3, 50),
                 xscale="linear",
                 yscale="linear",
-                secax=True,
+                secax=False,
             )
             self.plot_single_weight_hist(
                 pdf,
@@ -286,7 +287,8 @@ class Plots:
             y_combined = np.histogram(weights_combined, bins=bins)[0]
             y_combined_err = None
 
-        fig, ax = plt.subplots(figsize=(4.5, 4.5))
+        fig, ax = plt.subplots(figsize=(4, 3.5))
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
         if self.add_comb:
             self.hist_line(
                 ax,
@@ -337,7 +339,7 @@ class Plots:
         if yscale == "linear":
             ax.set_ylim(bottom=0)
         ax.legend(frameon=False, title=self.title)
-        plt.savefig(pdf, format="pdf", bbox_inches="tight")
+        plt.savefig(pdf, format="pdf")
         plt.close()
 
 
@@ -352,8 +354,14 @@ class Plots:
         assert self.log_gen_weights is not None
 
         with PdfPages(file) as pdf:
-            mean_w_bgen = np.mean(np.exp(self.log_gen_weights), axis=1)
-            std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
+            #mean_w_bgen = np.mean(np.exp(self.log_gen_weights), axis=1)
+            #std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
+            w_bgen = np.exp(self.log_gen_weights)
+            mean_w_bgen = np.median(w_bgen, axis=1)
+            std_w_bgen = (
+                np.quantile(w_bgen, 0.841, axis=1) -
+                np.quantile(w_bgen, 0.159, axis=1)
+            ) / 2
             std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
             if self.bayesian:
                 mean_w_bgen = np.repeat(
@@ -368,60 +376,113 @@ class Plots:
                 w_disc = self.weights_fake.flatten()
             else:
                 w_disc = self.weights_fake
-            x_bins = np.linspace(0,4,30)
-            y_bins = np.linspace(0,3,30)
+            ratio = std_w_bgen / mean_w_bgen
+            wbinn_bins = np.linspace(0,4,30)
+            wdisc_bins = np.linspace(0,3,30)
+            mswbg, _, _ = binned_statistic(w_disc, ratio, "median", wdisc_bins)
+            mswbg_stds = np.stack([
+                binned_statistic(w_disc, ratio, lambda x: np.nanquantile(x, 0.159), wdisc_bins)[0],
+                binned_statistic(w_disc, ratio, lambda x: np.nanquantile(x, 0.841), wdisc_bins)[0]
+            ], axis=0)
 
-            fig, ax = plt.subplots(figsize=(4.5,4.0))
+            fig, ax = plt.subplots(figsize=(4,3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
             _, _, _, img = ax.hist2d(
-                std_log_w_bgen,
+                ratio, #std_log_w_bgen,
                 w_disc,
-                bins=(x_bins, y_bins),
+                bins=(wbinn_bins, wdisc_bins),
                 rasterized=True,
                 norm = mpl.colors.LogNorm(),
                 density=True,
                 cmap="jet"
             )
-            cb = plt.colorbar(img)
-            cb.set_label('norm.')
-            ax.set_xlabel(r"$\sigma(\log p_\text{gen})$")
+            #cb = plt.colorbar(img)
+            #cb.set_label('norm.')
+            ax.set_xlabel(r"$\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
             ax.set_ylabel(r"$w_\text{disc}$")
 
-            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+
+            fig, axs = plt.subplots(
+                2, 1,
+                sharex = True,
+                figsize = (4, 5),
+                gridspec_kw = {"height_ratios": (2, 1.5), "hspace": 0.00}
+            )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.083,0.07,1.00,0.98))
+            _, _, _, img = axs[0].hist2d(
+                w_disc,
+                ratio, #std_log_w_bgen,
+                bins=(wdisc_bins, wbinn_bins),
+                rasterized=True,
+                norm = mpl.colors.LogNorm(),
+                density=True,
+                cmap="jet"
+            )
+            self.hist_line(
+                axs[1],
+                wdisc_bins,
+                mswbg,
+                y_err = None, #mswbg_stds,
+                label = "Shitbull",
+                color = self.colors[0]
+            )
+            #cb = plt.colorbar(img)
+            #cb.set_label('norm.')
+            axs[0].set_ylabel(r"$\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
+            axs[1].set_ylabel(r"median $\sigma / \mu$")
+            axs[1].set_xlabel(r"$w_\text{disc}$")
+            fig.align_ylabels()
+            self.corner_text(axs[1], self.title, "right", "top", h_offset=0.15)
+            plt.savefig(pdf, format="pdf")
             plt.close()
 
             fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
             pull = mean_w_bgen * (w_disc - 1) / std_w_bgen
-            low_lim = np.quantile(pull[np.isfinite(pull)], 0.0001)
-            high_lim = np.quantile(pull[np.isfinite(pull)], 0.9999)
-            #lim = max(high_lim, -low_lim)
-            bins = np.linspace(low_lim, high_lim, 50)
+            low_lim = np.quantile(pull[np.isfinite(pull)], 0.005)
+            high_lim = np.quantile(pull[np.isfinite(pull)], 0.995)
+            lim = max(high_lim, -low_lim)
+            bins = np.linspace(-lim, lim, 50)
             y, _ = np.histogram(pull, bins, density=True)
             self.hist_line(
                 ax,
                 bins,
                 y,
                 y_err = None,
-                label = "Gen",
+                label = "Pull",
                 color = self.colors[0]
             )
             x_fit, bins_fit, norm_param = self.fit_norm(bins, y, p0=(y.mean(), y.var()))
-            ax.plot(bins_fit, x_fit, label=r"$\mu={:.3f}$ $\sigma={:.3f}$".format(norm_param[0], norm_param[1]))
-            ax.set_xlabel(r"$(\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen}))$")
+            ax.plot(
+                bins_fit,
+                x_fit,
+                label="Fit",
+                color=self.colors[1]
+            )
+            ax.set_xlabel(r"$\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen})$")
             ax.set_ylabel("normalized")
             #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
-            ax.legend(loc='upper left')
+            ax.legend(loc="upper right", frameon=False, title = self.title)
+            self.corner_text(
+                ax,
+                f"$\\mu={norm_param[0]:.3f}$\n$\\sigma={norm_param[1]:.3f}$",
+                "left",
+                "top",
+            )
             #ax.set_ylim(top=2.0e1, bottom=1.0e-4)
-            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.savefig(pdf, format="pdf")
             plt.close()
 
             fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
             log_pull = np.log(w_disc) / std_log_w_bgen
-            bins = np.linspace(
-                np.quantile(log_pull[np.isfinite(log_pull)], 0.0001),
-                np.quantile(log_pull[np.isfinite(log_pull)], 0.9999),
-                50
-            )
+            low_lim = np.quantile(log_pull[np.isfinite(log_pull)], 0.005)
+            high_lim = np.quantile(log_pull[np.isfinite(log_pull)], 0.995)
+            lim = max(high_lim, -low_lim)
+            bins = np.linspace(-lim, lim, 50)
             y, _ = np.histogram(log_pull, bins, density=True)
             self.hist_line(
                 ax,
@@ -432,20 +493,46 @@ class Plots:
                 color = self.colors[0]
             )
             x_fit, bins_fit, norm_param = self.fit_norm(bins, y, p0=(y.mean(), y.var()))
-
-            ax.plot(bins_fit, x_fit, label=r"$\mu={:.3f}$ ""\n"" $\sigma={:.3f}$".format(norm_param[0], norm_param[1]), color='red')
+            ax.plot(
+                bins_fit,
+                x_fit,
+                label="Fit",
+                color=self.colors[1]
+            )
             ax.set_xlabel(r"$\log w_\text{disc} / \sigma(\log p_\text{gen})$")
             ax.set_ylabel("normalized")
             #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
             #ax.set_ylim(bottom=1.0e-2, top=y.max()+5)
-            ax.legend(loc='upper left')
-            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            ax.legend(loc="upper right", frameon=False)
+            self.corner_text(
+                ax,
+                f"$\\mu={norm_param[0]:.3f}$\n$\\sigma={norm_param[1]:.3f}$",
+                "left",
+                "top",
+            )
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+            self.hist_line(
+                ax,
+                wdisc_bins,
+                mswbg,
+                y_err = None,
+                label = "",
+                color = self.colors[1]
+            )
+            ax.set_xlabel(r"$w_\text{disc}$")
+            ax.set_ylabel(r"median $\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
+            self.corner_text(ax, self.title, "right", "top")
+            plt.savefig(pdf, format="pdf")
             plt.close()
 
     def fit_norm(self, bins, y, p0, points=1000):
         to_fit = norm.pdf
-        param, cov = curve_fit(to_fit, bins[:-1], y, p0=p0)
+        param, cov = curve_fit(to_fit, (bins[:-1]+bins[1:])/2, y, p0=p0)
         bins_fit = np.linspace(bins[0], bins[-1], points)
         pred = norm.pdf(bins_fit, loc=param[0], scale=param[1])
         return pred, bins_fit, param
@@ -499,6 +586,25 @@ class Plots:
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
 
+        if self.log_gen_weights is None:
+            fake_std = None
+        else:
+            gen_weights = np.exp(self.log_gen_weights)
+            mean_w_bgen = np.mean(gen_weights, axis=1, keepdims=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                norm_w_bgen = gen_weights / mean_w_bgen
+            norm_w_bgen[~np.isfinite(norm_w_bgen)] = 1.
+            hists = np.stack([
+                np.histogram(observable.fake_data, bins=bins, weights=norm_w_bgen[:,i])[0]
+                for i in range(norm_w_bgen.shape[1])
+            ], axis=1)
+            fake_median = np.median(hists, axis=1)
+            fake_std = np.stack((
+                np.quantile(hists, 0.159, axis=1) / fake_median * fake_hist,
+                np.quantile(hists, 0.841, axis=1) / fake_median * fake_hist
+            ), axis=0)
+
         lines = [
             Line(
                 y = true_hist,
@@ -507,6 +613,7 @@ class Plots:
             ),
             Line(
                 y = fake_hist,
+                y_err = fake_std,
                 y_ref = true_hist,
                 label = "Gen",
                 color = self.colors[1],
@@ -570,6 +677,10 @@ class Plots:
             weights_fake = np.median(self.weights_fake, axis=1)
         else:
             weights_fake = self.weights_fake
+            #mean_w_bgen = np.mean(np.exp(self.log_gen_weights), axis=1)
+            #std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
+            #std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
+            #weights_fake = std_log_w_bgen
 
         masks, labels = [], []
         for threshold in lower_thresholds:
@@ -592,7 +703,7 @@ class Plots:
                 y = true_hist,
                 label = "Truth",
                 color = "k",
-                fill = True
+                #fill = True
             ),
             *[
                 Line(y=hist, label=label, color=color)
@@ -607,11 +718,13 @@ class Plots:
         ax: mpl.axes.Axes,
         text: str,
         horizontal_pos: str,
-        vertical_pos: str
+        vertical_pos: str,
+        h_offset: float = 0.05,
+        v_offset: float = 0.05
     ):
         ax.text(
-            x = 0.95 if horizontal_pos == "right" else 0.05,
-            y = 0.95 if vertical_pos == "top" else 0.05,
+            x = 1 - h_offset if horizontal_pos == "right" else h_offset,
+            y = 1 - v_offset if vertical_pos == "top" else v_offset,
             s = text,
             horizontalalignment = horizontal_pos,
             verticalalignment = vertical_pos,
@@ -656,6 +769,7 @@ class Plots:
                 figsize = (6, 4.5),
                 gridspec_kw = {"height_ratios": (4, 1, 1)[:n_panels], "hspace": 0.00}
             )
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.08,0.08,0.99,0.98))
             if n_panels == 1:
                 axs = [axs]
 
@@ -705,7 +819,7 @@ class Plots:
             if show_ratios:
                 axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
                 axs[1].set_yticks([0.8,1,1.2])
-                axs[1].set_ylim([0.75,1.25])
+                axs[1].set_ylim([0.71,1.29])
                 axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
                 axs[1].axhline(y=1.2, c="black", ls="dotted", lw=0.5)
                 axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
@@ -715,14 +829,16 @@ class Plots:
                 axs[ax_idx].set_ylabel(r"$w$")
                 axs[ax_idx].axhline(y=1, c="black", ls="--", lw=0.7)
                 ymin, ymax = axs[ax_idx].get_ylim()
-                axs[ax_idx].set_ylim(ymin, min(ymax, 2))
+                ymax = min(ymax, 2.3)
+                yrange = ymax - ymin
+                axs[ax_idx].set_ylim(ymin - 0.05*yrange, ymax + 0.05*yrange)
 
             unit = "" if observable.unit is None else f" [{observable.unit}]"
             axs[-1].set_xlabel(f"${{{observable.tex_label}}}${unit}")
             axs[-1].set_xscale(observable.xscale)
             axs[-1].set_xlim(bins[0], bins[-1])
 
-            plt.savefig(pdf, format="pdf", bbox_inches="tight")
+            plt.savefig(pdf, format="pdf")
             plt.close()
 
 
