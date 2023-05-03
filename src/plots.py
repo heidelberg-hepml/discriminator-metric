@@ -398,8 +398,8 @@ class Plots:
             )
             #cb = plt.colorbar(img)
             #cb.set_label('norm.')
-            ax.set_xlabel(r"$\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
-            ax.set_ylabel(r"$w_\text{disc}$")
+            ax.set_xlabel(r"$\sigma(p_\text{model}) / \mu(p_\text{model})$")
+            ax.set_ylabel(r"$w$")
 
             plt.savefig(pdf, format="pdf")
             plt.close()
@@ -430,9 +430,9 @@ class Plots:
             )
             #cb = plt.colorbar(img)
             #cb.set_label('norm.')
-            axs[0].set_ylabel(r"$\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
+            axs[0].set_ylabel(r"$\sigma(p_\text{model}) / \mu(p_\text{model})$")
             axs[1].set_ylabel(r"median $\sigma / \mu$")
-            axs[1].set_xlabel(r"$w_\text{disc}$")
+            axs[1].set_xlabel(r"$w$")
             fig.align_ylabels()
             self.corner_text(axs[1], self.title, "right", "top", h_offset=0.15)
             plt.savefig(pdf, format="pdf")
@@ -461,7 +461,7 @@ class Plots:
                 label="Fit",
                 color=self.colors[1]
             )
-            ax.set_xlabel(r"$\mu(p_\text{gen}) (w_\text{disc} - 1) / \sigma(p_\text{gen})$")
+            ax.set_xlabel(r"$\mu(p_\text{model}) (w - 1) / \sigma(p_\text{model})$")
             ax.set_ylabel("normalized")
             #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
@@ -499,7 +499,7 @@ class Plots:
                 label="Fit",
                 color=self.colors[1]
             )
-            ax.set_xlabel(r"$\log w_\text{disc} / \sigma(\log p_\text{gen})$")
+            ax.set_xlabel(r"$\log w / \sigma(\log p_\text{model})$")
             ax.set_ylabel("normalized")
             #ax.set_yscale("log")
             ax.set_xlim(bins[0], bins[-1])
@@ -524,8 +524,8 @@ class Plots:
                 label = "",
                 color = self.colors[1]
             )
-            ax.set_xlabel(r"$w_\text{disc}$")
-            ax.set_ylabel(r"median $\sigma(p_\text{gen}) / \mu(p_\text{gen})$")
+            ax.set_xlabel(r"$w$")
+            ax.set_ylabel(r"median $\sigma(p_\text{model}) / \mu(p_\text{model})$")
             self.corner_text(ax, self.title, "right", "top")
             plt.savefig(pdf, format="pdf")
             plt.close()
