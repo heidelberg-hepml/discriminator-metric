@@ -8,7 +8,7 @@ from scripts.particlenet_utils import *
 from scripts.particlenet_models import get_particle_net, get_particle_net_lite
 import wandb
 from sklearn.metrics import roc_auc_score
-
+from keras.callbacks import ReduceLROnPlateau
 
 
 parser = argparse.ArgumentParser()
@@ -68,13 +68,21 @@ wandb.init(project=args.wandb_project,
 wandb.run.name = f'{args.exp_name}'
 
 # optimizer
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5,
+                              patience=4, min_lr=0.000001)
+
 model.compile(loss='categorical_crossentropy',
-              optimizer=keras.optimizers.Adam(learning_rate=lr_schedule(0)),
+              optimizer=keras.optimizers.Adam(learning_rate=1e-3),
               metrics=['accuracy'])
 
 
+#model.compile(loss='categorical_crossentropy',
+         #     optimizer=keras.optimizers.Adam(learning_rate=lr_schedule(0)),
+         #     metrics=['accuracy'])
 
-# Prepare model model saving directory.
+
+
+# Prepare  model saving directory.
 save_dir = f'output/{args.exp_name}'
 
 model_name = '%s_model.{epoch}.h5' % model_type
@@ -88,9 +96,9 @@ model_path = f'{save_dir}/{model_name}'
 # Prepare callbacks for model saving and for learning rate adjustment.
 
 
-lr_scheduler = keras.callbacks.LearningRateScheduler(lr_schedule)
+#lr_scheduler = keras.callbacks.LearningRateScheduler(lr_schedule)
 progress_bar = keras.callbacks.ProgbarLogger()
-callbacks = [epoch_save(model_path), lr_scheduler, progress_bar]
+callbacks = [epoch_save(model_path), reduce_lr, progress_bar]
 
 train_dataset.shuffle()
 history = model.fit(train_dataset.X, train_dataset.y,
@@ -104,16 +112,67 @@ history = model.fit(train_dataset.X, train_dataset.y,
 
 
 # Evaluate to find the best AUC model
+loss_train_list = []
+loss_val_list = []
+auc_val_list = []
+auc_train_list = []
+
+
+best_loss = 10000
 best_auc = 0
 for epoch in range(args.epochs):
   model.load_weights(f'{save_dir}/{model_type}_model.{epoch}.h5')
-  ypred = model.predict(val_dataset.X)
-  auc = roc_auc_score(val_dataset.y[:,1], ypred[:,1])
-  wandb.log({'val_auc': auc, 'epoch': epoch})
-  if auc > best_auc:
-    best_auc = auc
-    model.save(f'{save_dir}/best_model.h5')
-    np.save(f'{save_dir}/best_model_score.npy', ypred)
+  ypred_val = model.predict(val_dataset.X)
+  ypred_train = model.predict(train_dataset.X)
+
+  cce = tf.keras.losses.CategoricalCrossentropy()
+  loss_val = cce(val_dataset.y, ypred_val).numpy()
+
+  cce = tf.keras.losses.CategoricalCrossentropy()
+  loss_train = cce(train_dataset.y, ypred_train).numpy()
+
+  np.save(f'{save_dir}/score_val_{epoch}.npy', ypred_val)
+  np.save(f'{save_dir}/score_train_{epoch}.npy', ypred_train)
+
+  loss_train_list.append(loss_train)
+  loss_val_list.append(loss_val)
+
+  auc_val = roc_auc_score(val_dataset.y[:,0], ypred_val[:,0])
+  auc_train = roc_auc_score(train_dataset.y[:,0], ypred_train[:,0])
+
+  wandb.log({'loss_train': loss_train})
+  wandb.log({'loss_val': loss_val})
+  wandb.log({'auc_train': auc_train})
+  wandb.log({'auc_val': auc_val})
+
+
+  auc_train_list.append(auc_train)
+  auc_val_list.append(auc_val)
+
+  if loss_val < best_loss:
+    best_loss_epoch = epoch
+    best_loss = loss_val
+    np.save(f'{save_dir}/best_model_val_loss.npy', ypred_val)
+
+  if auc_val > best_auc:
+    best_auc_epoch = epoch
+    best_auc = auc_val
+    np.save(f'{save_dir}/best_model_val_auc.npy', ypred_val)
+
+
+#wandb.log({'best_val_auc': best_auc})
+#wandb.log({'best_val_loss': best_loss})
+
+
+
+# Save loss history
+np.save(f'{save_dir}/loss_train.npy', np.array(loss_train_list))
+np.save(f'{save_dir}/loss_val.npy', np.array(loss_val_list))
+
+# Save AUC history
+np.save(f'{save_dir}/auc_train.npy', np.array(auc_train_list))
+np.save(f'{save_dir}/auc_val.npy', np.array(auc_val_list))
+
 
 wandb.log({'best_val_auc': best_auc})
 

@@ -94,6 +94,8 @@ def lr_schedule(epoch):
         lr = 3 * 1e-4 - (3 * 1e-4 - 5 * 1e-7) * (epoch - 16) / 4   
     return lr
 
+
+
 class epoch_save(keras.callbacks.Callback):
     def __init__(self, model_path):
         self.model_path = model_path

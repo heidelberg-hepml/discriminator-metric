@@ -2,13 +2,14 @@
 
 
 # This script is used to train the Lorentz model on the JetNet dataset
+declare -a test_jets=('truth')
 
-declare -a test_jets=('shifted' 'eta_smeared' 'smeared' 'pt_shifted' 'pt_smeared' 'all_smeared')
+#declare -a test_jets=('shifted' 'eta_smeared' 'smeared' 'pt_shifted' 'pt_smeared' 'all_smeared')
 #declare -a test_jets=('shifted' 'eta_smeared')
 
 for test_jet in "${test_jets[@]}"
 do
-        for trial in 1
+        for trial in 1 2 3 4 5
         do
                 echo "Trial $test_jet $trial"
                 python -m torch.distributed.launch --nproc_per_node=2 \

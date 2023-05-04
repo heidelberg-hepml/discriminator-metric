@@ -116,7 +116,25 @@ def etaphipt_rel_to_epxpypz(jets,jet_data):
     return cart_jet
 
    
+def cart_to_ptetaphiE(jets):
+    """Converts cartesian coordinates to polar coordinates
+    """
+    px = jets[...,1]
+    py = jets[...,2]
+    pz = jets[...,3]
+    En = jets[...,0]
 
+    pt = np.sqrt(px**2+py**2)
+    eta = 0.5*np.log((En+pz)/(En-pz))
+    phi = np.arctan2(py,px)
+
+    polar_jet = jets.copy()
+    polar_jet[...,1] = eta
+    polar_jet[...,2] = phi
+    polar_jet[...,0] = pt
+    polar_jet[...,3] = En
+
+    return polar_jet
 
 
 def mjj_jets(jet):
@@ -140,3 +158,16 @@ def pt_jets(jet):
     py = np.sum(jet[...,2],axis=1)
     pt = np.sqrt(px**2+py**2)
     return pt
+
+def eta_jets(jet):
+    """Calculates the pseudorapidity of the jet"""
+    px = np.sum(jet[...,1],axis=1)
+    py = np.sum(jet[...,2],axis=1)
+    pz = np.sum(jet[...,3],axis=1)
+    p = np.sqrt(px**2+py**2)
+
+    eta = 0.5*np.log((p+pz)/(p-pz))
+
+
+    return eta
+   

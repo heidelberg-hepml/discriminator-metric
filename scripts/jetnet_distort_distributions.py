@@ -45,6 +45,13 @@ shifted_weights /= np.sum(shifted_weights)
 tailcut_weights = (mass < 0.17).astype(float)
 tailcut_weights /= np.sum(tailcut_weights)
 
+
+print(smeared_weights.shape)
+np.save('data/smeared.npy', smeared_weights)
+np.save('data/shifted.npy', shifted_weights)
+np.save('data/tailcut.npy', tailcut_weights)
+
+
 dists = OrderedDict(
     [
         ("truth", (np.ones(truth_jets_pf.shape[0]) / truth_jets_pf.shape[0], "Truth")),
@@ -76,8 +83,8 @@ for key, (weights, _) in dists.items():
       print(f'{key} Matched')
 
     cartesian_jets = etaphipt_epxpypz(distorted_jets_pf)
-    np.save(f'data/distorted_jets/{key}.npy', distorted_jets_pf)
-    np.save(f'data/distorted_jets/{key}_cartesian.npy', cartesian_jets)
+   # np.save(f'data/distorted_jets/{key}.npy', distorted_jets_pf)
+   # np.save(f'data/distorted_jets/{key}_cartesian.npy', cartesian_jets)
 
 
 
