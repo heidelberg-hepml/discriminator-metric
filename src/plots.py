@@ -7,13 +7,14 @@ import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import lognorm, norm, binned_statistic
 from scipy.optimize import curve_fit
+from sklearn.calibration import calibration_curve
 
 from .observable import Observable
 
 Line = namedtuple(
     "Line",
-    ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill"],
-    defaults = [None, None, None, None, None, False]
+    ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill", "linestyle"],
+    defaults = [None, None, None, None, None, False, None]
 )
 
 class Plots:
@@ -190,6 +191,28 @@ class Plots:
         plt.savefig(file)
         plt.close()
 
+    def plot_calibration_curve(self, file: str):
+        """
+        plot calibration curve
+        """
+        scores = np.concatenate((self.weights_fake, self.weights_true))
+        labels = np.concatenate((
+                    np.zeros_like(self.weights_fake),
+                    np.ones_like(self.weights_true))
+                    )
+        cls_output = scores/(1+scores)
+        prob_true, prob_pred = calibration_curve(labels, cls_output, n_bins=10)
+        
+        fig, ax = plt.subplots(figsize=(4, 3.5))
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+
+        ax.plot(prob_true, prob_pred, label='cal. curve')
+        ax.plot(np.linspace(0,1,10), np.linspace(0,1,10))
+        self.corner_text(ax, self.title, "right", "top", h_offset=0.15)
+
+        ax.legend()
+        plt.savefig(file)
+        plt.close()
 
     def plot_weight_hist(self, file: str):
         """
@@ -356,13 +379,16 @@ class Plots:
         with PdfPages(file) as pdf:
             #mean_w_bgen = np.mean(np.exp(self.log_gen_weights), axis=1)
             #std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
-            w_bgen = np.exp(self.log_gen_weights)
-            mean_w_bgen = np.median(w_bgen, axis=1)
+            #w_bgen = np.exp(self.log_gen_weights)
+            w_bgen = self.log_gen_weights
+            mean_w_bgen = np.nanmedian(w_bgen, axis=1)
+
             std_w_bgen = (
                 np.quantile(w_bgen, 0.841, axis=1) -
                 np.quantile(w_bgen, 0.159, axis=1)
             ) / 2
-            std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
+            std_log_w_bgen = np.nanstd(self.log_gen_weights, axis=1)
+
             if self.bayesian:
                 mean_w_bgen = np.repeat(
                     mean_w_bgen[:,None], self.weights_fake.shape[1], axis=1
@@ -377,9 +403,10 @@ class Plots:
             else:
                 w_disc = self.weights_fake
             ratio = std_w_bgen / mean_w_bgen
-            wbinn_bins = np.linspace(0,4,30)
+            wbinn_bins = np.linspace(0,0.01,30)
             wdisc_bins = np.linspace(0,3,30)
-            mswbg, _, _ = binned_statistic(w_disc, ratio, "median", wdisc_bins)
+            print(w_disc.shape, ratio.shape, wdisc_bins.shape)
+            mswbg, _, _ = binned_statistic(w_disc, ratio, lambda x: np.nanmedian(x), wdisc_bins)
             mswbg_stds = np.stack([
                 binned_statistic(w_disc, ratio, lambda x: np.nanquantile(x, 0.159), wdisc_bins)[0],
                 binned_statistic(w_disc, ratio, lambda x: np.nanquantile(x, 0.841), wdisc_bins)[0]
@@ -398,7 +425,7 @@ class Plots:
             )
             #cb = plt.colorbar(img)
             #cb.set_label('norm.')
-            ax.set_xlabel(r"$\sigma(p_\text{model}) / \mu(p_\text{model})$")
+            ax.set_xlabel(r"$\sigma(\log p_\text{model}) / \mu(\log p_\text{model})$")
             ax.set_ylabel(r"$w$")
 
             plt.savefig(pdf, format="pdf")
@@ -430,9 +457,11 @@ class Plots:
             )
             #cb = plt.colorbar(img)
             #cb.set_label('norm.')
-            axs[0].set_ylabel(r"$\sigma(p_\text{model}) / \mu(p_\text{model})$")
+            axs[0].set_ylabel(r"$\sigma(\log p_\text{model}) / \mu(\log p_\text{model})$")
             axs[1].set_ylabel(r"median $\sigma / \mu$")
             axs[1].set_xlabel(r"$w$")
+
+            fig.tight_layout()
             fig.align_ylabels()
             self.corner_text(axs[1], self.title, "right", "top", h_offset=0.15)
             plt.savefig(pdf, format="pdf")
@@ -608,7 +637,7 @@ class Plots:
         lines = [
             Line(
                 y = true_hist,
-                label = "Truth",
+                label = "Geant",
                 color = self.colors[0],
             ),
             Line(
@@ -690,6 +719,7 @@ class Plots:
             masks.append(weights_fake > threshold)
             labels.append(f"$w > {threshold}$")
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
+        fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
         hists = [
             np.histogram(
                 observable.fake_data[mask],
@@ -700,8 +730,14 @@ class Plots:
         ]
         lines = [
             Line(
+                y = fake_hist,
+                label = "Gen.",
+                color = "k",
+                linestyle = "--"
+            ),
+            Line(
                 y = true_hist,
-                label = "Truth",
+                label = "Geant",
                 color = "k",
                 #fill = True
             ),
@@ -787,7 +823,8 @@ class Plots:
                     line.y_err * scale if line.y_err is not None else None,
                     label=line.label,
                     color=line.color,
-                    fill=line.fill
+                    fill=line.fill,
+                    linestyle=line.linestyle,
                 )
 
                 ratio_panels = []
@@ -817,7 +854,7 @@ class Plots:
             #self.corner_text(axs[0], self.title, "right", "top")
 
             if show_ratios:
-                axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
+                axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Geant}}$")
                 axs[1].set_yticks([0.8,1,1.2])
                 axs[1].set_ylim([0.71,1.29])
                 axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
@@ -850,7 +887,8 @@ class Plots:
         y_err: np.ndarray,
         label: str,
         color: str,
-        fill: bool = False
+        fill: bool = False,
+        linestyle: str = None,
     ):
         """
         Plot a stepped line for a histogram, optionally with error bars.
@@ -863,6 +901,7 @@ class Plots:
             label: Label of the line
             color: Color of the line
             fill: Filled histogram
+            linestyle
         """
 
         dup_last = lambda a: np.append(a, a[-1])
@@ -874,7 +913,8 @@ class Plots:
                 label = label,
                 facecolor = color,
                 step = "post",
-                alpha = 0.2
+                alpha = 0.2,
+                linestyle = linestyle
             )
         else:
             ax.step(
@@ -884,6 +924,7 @@ class Plots:
                 color = color,
                 linewidth = 1.0,
                 where = "post",
+                linestyle = linestyle
             )
         if y_err is not None:
             if len(y_err.shape) == 2:
