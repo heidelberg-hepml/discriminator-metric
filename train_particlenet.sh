@@ -10,10 +10,10 @@ declare -a test_jets=('tailcut' 'truth')
 
 for test_jet in "${test_jets[@]}"
 do
-    for trial in 1 2 3 4 5
+    for trial in 6 7 8 9 10
     do
         echo "Trial $test_jet $trial"
-        python -m train_particlenet --gpu 2 --train_dir data/converted/train_${test_jet}_file.awkd \
+        python -m train_particlenet --gpu 0 --train_dir data/converted/train_${test_jet}_file.awkd \
             --val_dir data/converted/valid_${test_jet}_file.awkd --model_type particle_net_lite \
             --epochs 20 --exp_name trial_${trial}_pn_lite_${test_jet} \
             --wandb_project discr-metric \

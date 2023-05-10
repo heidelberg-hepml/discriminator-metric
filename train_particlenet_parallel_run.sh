@@ -10,7 +10,7 @@ declare -a test_jets=('smeared' 'shifted')
 
 for test_jet in "${test_jets[@]}"
 do
-    for trial in 1 2 3 4 5
+    for trial in 6 7 8 9 10
     do
         echo "Trial $test_jet $trial"
         python -m train_particlenet --gpu 1 --train_dir data/converted/train_${test_jet}_file.awkd \
