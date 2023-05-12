@@ -62,6 +62,8 @@ def load(params: dict) -> list[DiscriminatorData]:
             params["train_split"],
             params["test_split"]
         )
+        #np.save("test_true.npy", test_true)
+        #np.save("test_fake.npy", test_fake)
         if fake_log_weights is None:
             test_logw = None
         else:
@@ -176,7 +178,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
                 tex_label = f"p_{{T,{PARTICLE_NAMES[i]}}}",
                 bins = np.linspace(
                     np.min(obs_one_true[i].pt),
-                    np.quantile(obs_one_true[i].pt, 0.99),
+                    np.quantile(obs_one_true[i].pt, 0.9995), #PREV: 0.99
                     50
                 ),
                 yscale = "log",
@@ -186,7 +188,8 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
                 true_data = obs_one_true[i].eta,
                 fake_data = obs_one_fake[i].eta,
                 tex_label = f"\\eta_{{{PARTICLE_NAMES[i]}}}",
-                bins = np.linspace(-6, 6, 50),
+                bins = np.linspace(-7, 7, 50),
+                #yscale = "log", #NEW
             )
         ])
         if i >= 2:

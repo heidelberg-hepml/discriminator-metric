@@ -108,6 +108,8 @@ def main():
         plots.plot_roc(doc.add_file(f"roc_{data.suffix}.pdf"))
         print("    Plotting weights")
         plots.plot_weight_hist(doc.add_file(f"weights_{data.suffix}.pdf"))
+        print("    Plotting calibration")
+        plots.plot_calibration_curve(doc.add_file(f"calibration_{data.suffix}.pdf"))
         if data.test_logw is not None:
             print("    Plotting generator errors")
             plots.plot_bgen_weights(doc.add_file(f"gen_errors_{data.suffix}.pdf"))
@@ -122,6 +124,7 @@ def main():
                 lower_thresholds,
                 upper_thresholds
             )
+            #plots.plot_clustering_diff(doc.add_file(f"clustering_diff_{data.suffix}.pdf"))
 
 
 if __name__ == "__main__":

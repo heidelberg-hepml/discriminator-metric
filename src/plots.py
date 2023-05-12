@@ -5,15 +5,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
-from scipy.stats import lognorm, norm, binned_statistic
+from scipy.stats import lognorm, norm, binned_statistic, chi2
 from scipy.optimize import curve_fit
+from sklearn.calibration import calibration_curve
 
 from .observable import Observable
 
 Line = namedtuple(
     "Line",
-    ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill"],
-    defaults = [None, None, None, None, None, False]
+    ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill", "ls", "zorder"],
+    defaults = [None, None, None, None, None, False, "solid", 0]
 )
 
 class Plots:
@@ -63,8 +64,8 @@ class Plots:
 
     def process_weights(self, weights_true, weights_fake):
         w_comb = np.concatenate((weights_true, weights_fake), axis=0)
-        self.p_low = np.percentile(w_comb[w_comb!=0], 0.01)
-        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.99)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0) #0.01)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 100) #99.99)
 
         weights_true[weights_true >= self.p_high] = self.p_high
         weights_fake[weights_fake <= self.p_low] = self.p_low
@@ -226,6 +227,13 @@ class Plots:
                 yscale="log",
                 secax=False,
             )
+            self.plot_single_weight_hist(
+                pdf,
+                bins=np.logspace(-3.9, 3.9, 50),
+                xscale="log",
+                yscale="log",
+                secax=False,
+            )
 
 
     def plot_single_weight_hist(
@@ -341,6 +349,82 @@ class Plots:
         ax.legend(frameon=False, title=self.title)
         plt.savefig(pdf, format="pdf")
         plt.close()
+
+
+    def plot_calibration_curve(self, file: str):
+        """
+        plot calibration curve
+        """
+        nlt, nlf = np.mean(self.weights_true < 1), np.mean(self.weights_fake < 1)
+        print(f"      ${nlt*100:.1f}\\%$ & ${nlf*100:.1f}\\%$ & ${(1-nlt)*100:.1f}\\%$ & ${(1-nlf)*100:.1f}\\%$")
+        with PdfPages(file) as pdf:
+            scores = np.concatenate((self.weights_fake, self.weights_true[:len(self.weights_fake)]))
+            labels = np.concatenate((
+                        np.zeros_like(self.weights_fake),
+                        np.ones_like(self.weights_true[:len(self.weights_fake)]))
+                        )
+            cls_output = scores/(1+scores)
+
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+
+            prob_true, prob_pred = calibration_curve(labels, cls_output, n_bins=30)
+            ax.plot(prob_true, prob_pred)
+            ax.plot([0,1], [0,1], color="k", ls="dashed")
+            self.corner_text(ax, self.title, "left", "top")
+            ax.set_xlabel("predicted probability")
+            ax.set_ylabel("fraction of positives")
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+            
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+            p_low, p_high = 1e-2, 1e+2
+            wc = np.logspace(np.log10(p_low), np.log10(p_high), 30)
+            n_true, n_fake = np.zeros_like(wc), np.zeros_like(wc)
+            for i, w in enumerate(wc):
+                n_true[i] = np.mean(self.weights_true < w)
+                n_fake[i] = np.mean(self.weights_fake < w)
+            
+            ax.plot(wc, n_true/n_fake, label=r"$w < w_c$")
+            ax.plot(wc, (1-n_true)/(1-n_fake), label=r"$w > w_c$")
+            ax.plot([p_low,p_high], [p_low,p_high], color="k", ls="dashed")
+            self.corner_text(ax, self.title, "left", "top")
+            ax.set_xlabel(r"$w_c$")
+            ax.set_ylabel(r"$N_\text{truth} / N_\text{gen}$")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlim(p_low, p_high)
+            ax.legend(frameon=False)
+
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+            
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+            wc_middle = (wc[1:] + wc[:-1]) / 2
+            true_bins, _ = np.histogram(self.weights_true, bins=wc)
+            fake_bins, _ = np.histogram(self.weights_fake, bins=wc)
+            true_bins_norm, fake_bins_norm = len(self.weights_true), len(self.weights_fake)
+            true_bins_err, fake_bins_err = np.sqrt(true_bins), np.sqrt(fake_bins)
+            ratio = (true_bins/true_bins_norm)/(fake_bins/fake_bins_norm)
+            ratio_err = ratio * np.sqrt(
+                (true_bins_err/true_bins)**2 + (fake_bins_err/fake_bins)**2
+            )
+            self.hist_line(ax, wc, ratio, ratio_err, label="", color=self.colors[0])
+            #ax.plot(wc_middle, true_bins/fake_bins)
+            #ax.plot(wc_middle, (1-n_true)/(1-n_fake), label=r"$w > w_c$")
+            ax.plot([p_low,p_high], [p_low,p_high], color="k", ls="dashed")
+            self.corner_text(ax, self.title, "left", "top")
+            ax.set_xlabel(r"$w_c$")
+            ax.set_ylabel(r"$N_\text{truth} / N_\text{gen}$")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlim(p_low, p_high)
+            #ax.legend(frameon=False)
+
+            plt.savefig(pdf, format="pdf")
+            plt.close()
 
 
     def plot_bgen_weights(self, file: str):
@@ -681,15 +765,26 @@ class Plots:
             #std_w_bgen = np.std(np.exp(self.log_gen_weights), axis=1)
             #std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
             #weights_fake = std_log_w_bgen
+        weights_true = self.weights_true
 
-        masks, labels = [], []
+        masks, labels, colors, masks_true, labels_true, colors_true = [], [], [], [], [], []
+        color_count = 0
         for threshold in lower_thresholds:
             masks.append(weights_fake < threshold)
+            #masks_true.append(weights_true < threshold)
             labels.append(f"$w < {threshold}$")
+            colors.append(self.colors[color_count])
+            color_count += 1
         for threshold in upper_thresholds:
-            masks.append(weights_fake > threshold)
-            labels.append(f"$w > {threshold}$")
+            #masks.append(weights_fake > threshold)
+            masks_true.append(weights_true > threshold)
+            labels_true.append(f"$w > {threshold}$")
+            colors_true.append(self.colors[color_count])
+            color_count += 1
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
+        fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
+        hist_norm = len(observable.fake_data) / np.sum(fake_hist)
+        fake_err = np.sqrt(fake_hist / hist_norm)
         hists = [
             np.histogram(
                 observable.fake_data[mask],
@@ -698,19 +793,165 @@ class Plots:
             )[0]
             for mask in masks
         ]
+        hists_true = [
+            np.histogram(
+                observable.true_data[mask],
+                bins=bins,
+                density=True
+            )[0]
+            for mask in masks_true
+        ]
         lines = [
             Line(
                 y = true_hist,
                 label = "Truth",
                 color = "k",
+                ls = "dashed",
+                zorder = 100,
+                #fill = True
+            ),
+            Line(
+                y = fake_hist,
+                y_ref = true_hist,
+                y_err = fake_err,
+                label = "Gen",
+                color = "k",
+                zorder = 100,
                 #fill = True
             ),
             *[
+                Line(y=hist, label=label, color=color) #, ls="dashed")
+                for hist, label, color in zip(hists, labels, colors)
+            ],
+            *[
                 Line(y=hist, label=label, color=color)
-                for hist, label, color in zip(hists, labels, self.colors)
+                for hist, label, color in zip(hists_true, labels_true, colors_true)
             ]
+            #*[
+            #    Line(y=hist, label=label, color=color)
+            #    for hist, label, color in zip(hists, labels, self.colors)
+            #]
         ]
-        self.hist_plot(pdf, lines, bins, observable, show_ratios=False, show_weights=False)
+        self.hist_plot(pdf, lines, bins, observable, show_ratios=True, show_weights=False)
+
+
+    def plot_clustering_diff(
+        self,
+        file: str,
+    ):
+        """
+
+        Args:
+            file: Output file name
+        """
+        with PdfPages(file) as pdf:
+            for observable in self.observables:
+                self.plot_single_clustering_diff(pdf, observable)
+
+
+    def plot_single_clustering_diff(
+        self,
+        pdf: PdfPages,
+        observable: Observable
+    ):
+        bins = observable.bins #[::2]
+        if self.bayesian:
+            weights_fake = np.median(self.weights_fake, axis=1)
+        else:
+            weights_fake = self.weights_fake
+        weights_true = self.weights_true
+
+        true_hist, _ = np.histogram(observable.true_data, bins=bins)
+        fake_hist, _ = np.histogram(observable.fake_data, bins=bins)
+        true_hist_err = np.sqrt(true_hist)
+        true_hist_scale = np.sum(true_hist)
+        fake_hist_scale = np.sum(fake_hist)
+        chi2_high_low = []
+        chi2_high_true = []
+        chi2_low_true = []
+        nzbins_high_true = []
+        nzbins_low_true = []
+        quantiles = np.logspace(-2, 0, 20)
+        for quantile in quantiles:
+            lower_threshold = max(np.quantile(weights_fake, quantile), np.quantile(weights_true, quantile))
+            upper_threshold = min(np.quantile(weights_fake, 1-quantile), np.quantile(weights_true, 1-quantile))
+            low_hist, _ = np.histogram(
+                observable.fake_data[weights_fake < lower_threshold], bins=bins
+            )
+            high_hist, _ = np.histogram(
+                observable.fake_data[weights_fake > upper_threshold], bins=bins
+            )
+            low_hist_true, _ = np.histogram(
+                observable.true_data[weights_true < lower_threshold], bins=bins
+            )
+            high_hist_true, _ = np.histogram(
+                observable.true_data[weights_true > upper_threshold], bins=bins
+            )
+            low_hist_err, high_hist_err = np.sqrt(low_hist), np.sqrt(high_hist)
+            low_hist_scale, high_hist_scale = np.sum(low_hist), np.sum(high_hist)
+            low_hist_true_err, high_hist_true_err = np.sqrt(low_hist_true), np.sqrt(high_hist_true)
+            low_hist_true_scale, high_hist_true_scale = np.sum(low_hist_true), np.sum(high_hist_true)
+
+            #chi2_high_low.append(np.sum(
+            #    (low_hist / fake_hist_scale - high_hist / fake_hist_scale)**2 /
+            #    ((low_hist_err / fake_hist_scale)**2 + (high_hist_err / fake_hist_scale)**2)
+            #))
+            #chi2_high_true.append(np.sum(
+            #    (high_hist / fake_hist_scale - true_hist / fake_hist_scale)**2 /
+            #    ((high_hist_err / fake_hist_scale)**2 + (true_hist_err / fake_hist_scale)**2)
+            #))
+            #chi2_low_true.append(np.sum(
+            #    (low_hist / fake_hist_scale - true_hist / fake_hist_scale)**2 /
+            #    ((low_hist_err / fake_hist_scale)**2 + (true_hist_err / fake_hist_scale)**2)
+            #))
+            #chi2_high_true.append(np.sum(
+            #    (high_hist / fake_hist_scale - high_hist_true / true_hist_scale)**2 /
+            #    ((high_hist_err / fake_hist_scale)**2 + (high_hist_true_err / true_hist_scale)**2)
+            #))
+            #chi2_low_true.append(np.sum(
+            #    (low_hist / fake_hist_scale - low_hist_true / true_hist_scale)**2 /
+            #    ((low_hist_err / fake_hist_scale)**2 + (low_hist_true_err / true_hist_scale)**2)
+            #))
+
+            #chi2_high_low.append(np.sum(
+            #    (low_hist / low_hist_scale - high_hist / high_hist_scale)**2 /
+            #    ((low_hist_err / low_hist_scale)**2 + (high_hist_err / high_hist_scale)**2)
+            #))
+            #chi2_high_true.append(np.sum(
+            #    (high_hist / high_hist_scale - true_hist / true_hist_scale)**2 /
+            #    ((high_hist_err / high_hist_scale)**2 + (true_hist_err / true_hist_scale)**2)
+            #))
+            #chi2_low_true.append(np.sum(
+            #    (low_hist / low_hist_scale - true_hist / true_hist_scale)**2 /
+            #    ((low_hist_err / low_hist_scale)**2 + (true_hist_err / true_hist_scale)**2)
+            #))
+            chi2_high_true.append(np.sum(
+                (high_hist / high_hist_scale - high_hist_true / high_hist_true_scale)**2 /
+                ((high_hist_err / high_hist_scale)**2 + (high_hist_true_err / high_hist_true_scale)**2 + 1e-15)
+            ))
+            chi2_low_true.append(np.sum(
+                (low_hist / low_hist_scale - low_hist_true / low_hist_true_scale)**2 /
+                ((low_hist_err / low_hist_scale)**2 + (low_hist_true_err / low_hist_true_scale)**2 + 1e-15)
+            ))
+            nzbins_high_true = np.sum(high_hist + high_hist_true != 0)
+            nzbins_low_true = np.sum(low_hist + low_hist_true != 0)
+
+        fig, ax = plt.subplots(figsize=(4,3.5))
+        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+        #ax.plot(quantiles, 1-chi2.cdf(np.array(chi2_high_low), len(bins)-1), color=self.colors[0], label="high vs low")
+        #ax.plot(quantiles, 1-chi2.cdf(np.array(chi2_high_true), len(bins)-1), color=self.colors[1], label="high vs truth")
+        #ax.plot(quantiles, 1-chi2.cdf(np.array(chi2_low_true), len(bins)-1), color=self.colors[2], label="low vs truth")
+        ax.plot(quantiles, 1-chi2.cdf(np.array(chi2_high_true), nzbins_high_true-1), color=self.colors[1], label="high tail")
+        ax.plot(quantiles, 1-chi2.cdf(np.array(chi2_low_true), nzbins_low_true-1), color=self.colors[2], label="low tail")
+        ax.set_xlabel(f"quantile ${{{observable.tex_label}}}$")
+        ax.set_ylabel(r"$p$-value")
+        ax.set_xscale("log")
+        ax.set_yscale("symlog", linthresh=1e-7)
+        ax.set_ylim(-1e-8,1)
+        ax.legend(frameon=False, title=self.title)
+        #self.corner_text(ax, self.title, "right", "top")
+        plt.savefig(pdf, format="pdf", bbox_inches="tight")
+        plt.close()
 
 
     def corner_text(
@@ -787,7 +1028,9 @@ class Plots:
                     line.y_err * scale if line.y_err is not None else None,
                     label=line.label,
                     color=line.color,
-                    fill=line.fill
+                    fill=line.fill,
+                    ls=line.ls,
+                    zorder=line.zorder
                 )
 
                 ratio_panels = []
@@ -814,15 +1057,24 @@ class Plots:
             axs[0].legend(frameon=False, title=self.title)
             axs[0].set_ylabel("normalized")
             axs[0].set_yscale(observable.yscale)
+            if observable.yscale != "log":
+                axs[0].set_ylim(ymin=0)
             #self.corner_text(axs[0], self.title, "right", "top")
 
             if show_ratios:
-                axs[1].set_ylabel(r"$\frac{\mathrm{Model}}{\mathrm{Truth}}$")
-                axs[1].set_yticks([0.8,1,1.2])
-                axs[1].set_ylim([0.71,1.29])
-                axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
-                axs[1].axhline(y=1.2, c="black", ls="dotted", lw=0.5)
-                axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
+                axs[1].set_ylabel(r"$\frac{\mathrm{Gen}}{\mathrm{Truth}}$")
+                if np.mean((ratio < 0.8) | (ratio > 1.2)) > 0.25:
+                    axs[1].set_yticks([0.5,1,1.5])
+                    axs[1].set_ylim([0.25,1.81])
+                    axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
+                    axs[1].axhline(y=1.5, c="black", ls="dotted", lw=0.5)
+                    axs[1].axhline(y=0.5, c="black", ls="dotted", lw=0.5)
+                else:
+                    axs[1].set_yticks([0.8,1,1.2])
+                    axs[1].set_ylim([0.65,1.35])
+                    axs[1].axhline(y=1, c="black", ls="--", lw=0.7)
+                    axs[1].axhline(y=1.2, c="black", ls="dotted", lw=0.5)
+                    axs[1].axhline(y=0.8, c="black", ls="dotted", lw=0.5)
 
             if show_weights:
                 ax_idx = 1+int(show_ratios)
@@ -850,7 +1102,9 @@ class Plots:
         y_err: np.ndarray,
         label: str,
         color: str,
-        fill: bool = False
+        fill: bool = False,
+        ls: str = "solid",
+        zorder: int = 0
     ):
         """
         Plot a stepped line for a histogram, optionally with error bars.
@@ -867,6 +1121,7 @@ class Plots:
 
         dup_last = lambda a: np.append(a, a[-1])
 
+        alpha_factor = 0.4 if color == "k" else 1.0
         if fill:
             ax.fill_between(
                 bins,
@@ -884,6 +1139,9 @@ class Plots:
                 color = color,
                 linewidth = 1.0,
                 where = "post",
+                alpha = 1.0 * alpha_factor,
+                ls = ls,
+                zorder = zorder,
             )
         if y_err is not None:
             if len(y_err.shape) == 2:
@@ -897,7 +1155,7 @@ class Plots:
                 bins,
                 dup_last(y_high),
                 color = color,
-                alpha = 0.5,
+                alpha = 0.5 * alpha_factor,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -905,7 +1163,7 @@ class Plots:
                 bins,
                 dup_last(y_low),
                 color = color,
-                alpha = 0.5,
+                alpha = 0.5 * alpha_factor,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -914,6 +1172,6 @@ class Plots:
                 dup_last(y_low),
                 dup_last(y_high),
                 facecolor = color,
-                alpha = 0.3,
+                alpha = 0.3 * alpha_factor,
                 step = "post"
             )
