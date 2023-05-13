@@ -26,9 +26,11 @@ class Documenter:
             doc: Created documenter object
             params: Dictionary with the loaded parameters
         """
-        doc = Documenter(run_name[16:], existing_run=run_name, read_only=read_only)
-        with open(doc.get_file("params.yaml", False)) as f:
+        with open(run_name) as f:
             params = yaml.load(f, Loader=yaml.FullLoader)
+        
+        run_name = params.get('run_name')
+        doc = Documenter(run_name, existing_run=run_name, read_only=read_only)
         return doc, params
 
     @staticmethod

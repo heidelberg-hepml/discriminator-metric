@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--load_model", action="store_true")
     parser.add_argument("--model_name", type=str, default="best")
     parser.add_argument("--load_weights", action="store_true")
+    parser.add_argument("--cal_cls", action="store_true")
     args = parser.parse_args()
 
     if args.load_model:
@@ -63,6 +64,10 @@ def main():
             print("  Running training")
             training.train()
 
+        if args.cal_cls:
+            print(" Calibrating classifier")
+            training.calibrate_classifier()
+
         print(f"  Loading model {args.model_name}")
         training.load(args.model_name)
 
@@ -101,7 +106,11 @@ def main():
             labels,
             add_comb,
             data.test_logw,
+            training.data.test_fake,
+            training.data.test_true,
         )
+
+        plots.plot_calibration_curve(doc.add_file(f"cal_curve_{data.suffix}.pdf"))
         print("    Plotting losses")
         plots.plot_losses(doc.add_file(f"losses_{data.suffix}.pdf"))
         print("    Plotting ROC")
@@ -122,6 +131,9 @@ def main():
                 lower_thresholds,
                 upper_thresholds
             )
+            plots.plot_avg_showers(doc.add_file(f"avg_showers_{data.suffix}.pdf"), 
+                    lower_thresholds, upper_thresholds)
+
 
 
 if __name__ == "__main__":

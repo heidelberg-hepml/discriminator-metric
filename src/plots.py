@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+from matplotlib.colors import LogNorm
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import lognorm, norm, binned_statistic
 from scipy.optimize import curve_fit
@@ -32,6 +33,8 @@ class Plots:
         labels_w_hist: list[str],
         add_comb: bool,
         log_gen_weights: Optional[np.ndarray] = None,
+        showers_fake: Optional[np.ndarray] = None,
+        showers_true: Optional[np.ndarray] = None,
     ):
         """
         Initializes the plotting pipeline with the data to be plotted.
@@ -55,6 +58,8 @@ class Plots:
         self.labels_w_hist = labels_w_hist
         self.add_comb = add_comb
         self.eps = 1.0e-10
+        self.showers_fake = showers_fake
+        self.showers_true = showers_true
 
         plt.rc("font", family="serif", size=16)
         plt.rc("axes", titlesize="medium")
@@ -64,8 +69,8 @@ class Plots:
 
     def process_weights(self, weights_true, weights_fake):
         w_comb = np.concatenate((weights_true, weights_fake), axis=0)
-        self.p_low = np.percentile(w_comb[w_comb!=0], 0.01)
-        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.99)
+        self.p_low = np.percentile(w_comb[w_comb!=0], 0.005)
+        self.p_high = np.percentile(w_comb[w_comb!=np.inf], 99.995)
 
         weights_true[weights_true >= self.p_high] = self.p_high
         weights_fake[weights_fake <= self.p_low] = self.p_low
@@ -178,8 +183,8 @@ class Plots:
             ax.plot(fpr, tpr, color=self.colors[0])
         ax.plot([0,1], [0,1], color="k", ls="dashed")
 
-        ax.set_xlabel(r"$\epsilon_S$")
-        ax.set_ylabel(r"$\epsilon_B$")
+        ax.set_xlabel(r"$\epsilon_B$")
+        ax.set_ylabel(r"$\epsilon_S$")
         self.corner_text(
             ax,
             f"AUC = ${np.mean(auc):.3f} \\pm {np.std(auc):.3f}$"
@@ -208,7 +213,7 @@ class Plots:
 
         ax.plot(prob_true, prob_pred, label='cal. curve')
         ax.plot(np.linspace(0,1,10), np.linspace(0,1,10))
-        self.corner_text(ax, self.title, "right", "top", h_offset=0.15)
+        self.corner_text(ax, self.title, "right", "bottom", h_offset=0.15)
 
         ax.legend()
         plt.savefig(file)
@@ -244,7 +249,7 @@ class Plots:
             )
             self.plot_single_weight_hist(
                 pdf,
-                bins=np.logspace(-2, 1, 50),
+                bins=np.logspace(-2, 2, 50),
                 xscale="log",
                 yscale="log",
                 secax=False,
@@ -718,8 +723,13 @@ class Plots:
         for threshold in upper_thresholds:
             masks.append(weights_fake > threshold)
             labels.append(f"$w > {threshold}$")
+
+        mks = self.showers_true[:, 432:504].sum(1) > 2.e-3
+        mks2 = self.showers_fake[:, 432:504].sum(1) > 2.e-3
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
+        true_count, _ = np.histogram(observable.true_data, bins=bins, density=False)
+
         hists = [
             np.histogram(
                 observable.fake_data[mask],
@@ -731,14 +741,16 @@ class Plots:
         lines = [
             Line(
                 y = fake_hist,
+                y_ref = true_hist,
+                y_err = true_hist/np.sqrt(true_count),
                 label = "Gen.",
                 color = "k",
-                linestyle = "--"
             ),
             Line(
                 y = true_hist,
                 label = "Geant",
                 color = "k",
+                linestyle = '--',
                 #fill = True
             ),
             *[
@@ -746,7 +758,7 @@ class Plots:
                 for hist, label, color in zip(hists, labels, self.colors)
             ]
         ]
-        self.hist_plot(pdf, lines, bins, observable, show_ratios=False, show_weights=False)
+        self.hist_plot(pdf, lines, bins, observable, show_ratios=True, show_weights=False)
 
 
     def corner_text(
@@ -938,7 +950,7 @@ class Plots:
                 bins,
                 dup_last(y_high),
                 color = color,
-                alpha = 0.5,
+                alpha = 0.3,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -946,7 +958,7 @@ class Plots:
                 bins,
                 dup_last(y_low),
                 color = color,
-                alpha = 0.5,
+                alpha = 0.3,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -958,3 +970,94 @@ class Plots:
                 alpha = 0.3,
                 step = "post"
             )
+    
+    def plot_avg_showers(self, file: str, lower_thresholds: list[float],
+            upper_thresholds: list[float]):
+
+        masks, labels = [], []
+        for threshold in lower_thresholds:
+            masks.append(self.weights_fake < threshold)
+            labels.append(f"$w < {threshold}$")
+        for threshold in upper_thresholds:
+            masks.append(self.weights_fake > threshold)
+            labels.append(f"$w > {threshold}$")
+        
+        bin1 = np.arange(0, 96, 10)
+        bin2 = np.arange(0, 3, 1)
+        bin3 = np.arange(0, 12, 1)
+        bin4 = np.arange(0, 6, 1)
+
+        with PdfPages(file) as pdf:
+            for i, _ in enumerate(masks):
+                fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+            
+                lay_0 = self.showers_fake[masks[i]][:, :288].reshape(-1, 3, 96).mean(0)
+                lay_1 = self.showers_fake[masks[i]][:, 288:432].reshape(-1, 12, 12).mean(0)
+                lay_2 = self.showers_fake[masks[i]][:, 432:504].reshape(-1, 12, 6).mean(0)
+
+                img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', cmap='viridis', interpolation='none')
+                img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', cmap='viridis', interpolation='none')
+                img2 = ax[2].imshow(lay_2, norm=LogNorm(1.e-7, 5.e-3), aspect='auto', cmap='viridis', interpolation='none')
+
+                fig.colorbar(img0, ax=ax[0])
+                fig.colorbar(img1, ax=ax[1])
+                fig.colorbar(img2, ax=ax[2])
+                ax[0].set_xticks(bin1)
+                ax[0].set_yticks(bin2)
+                ax[1].set_xticks(bin3)
+                ax[1].set_yticks(bin3)
+                ax[2].set_xticks(bin4)
+                ax[2].set_yticks(bin3)
+
+                plt.suptitle('Average energy deposition, '+self.title+' '+labels[i])
+                plt.savefig(pdf, format='pdf')
+                plt.close()
+
+            fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+            
+            lay_0 = self.showers_fake[:, :288].reshape(-1, 3, 96).mean(0)
+            lay_1 = self.showers_fake[:, 288:432].reshape(-1, 12, 12).mean(0)
+            lay_2 = self.showers_fake[:, 432:504].reshape(-1, 12, 6).mean(0)
+
+            img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', interpolation='none')
+            img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', interpolation='none')
+            img2 = ax[2].imshow(lay_2, norm=LogNorm(1.e-7, 5.e-3), aspect='auto', interpolation='none')
+            
+            fig.colorbar(img0, ax=ax[0])
+            fig.colorbar(img1, ax=ax[1])
+            fig.colorbar(img2, ax=ax[2])
+            ax[0].set_xticks(bin1)
+            ax[0].set_yticks(bin2)
+            ax[1].set_xticks(bin3)
+            ax[1].set_yticks(bin3)
+            ax[2].set_xticks(bin4)
+            ax[2].set_yticks(bin3)
+            
+            plt.suptitle('Average energy deposition, '+self.title+' Model')
+            plt.savefig(pdf, format='pdf')
+            plt.close()
+
+            fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+            
+            lay_0 = self.showers_true[:, :288].reshape(-1, 3, 96).mean(0)
+            lay_1 = self.showers_true[:, 288:432].reshape(-1, 12, 12).mean(0)
+            lay_2 = self.showers_true[:, 432:504].reshape(-1, 12, 6).mean(0)
+
+            img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', interpolation='none')
+            img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', interpolation='none')
+            img2 = ax[2].imshow(lay_2, norm=LogNorm(1.e-7, 5.e-3), aspect='auto', interpolation='none')
+
+            fig.colorbar(img0, ax=ax[0])
+            fig.colorbar(img1, ax=ax[1])
+            fig.colorbar(img2, ax=ax[2])
+            
+            ax[0].set_xticks(bin1)
+            ax[0].set_yticks(bin2)
+            ax[1].set_xticks(bin3)
+            ax[1].set_yticks(bin3)
+            ax[2].set_xticks(bin4)
+            ax[2].set_yticks(bin3)
+            
+            plt.suptitle('Average energy deposition, '+self.title+' Geant')
+            plt.savefig(pdf, format='pdf')
+            plt.close()

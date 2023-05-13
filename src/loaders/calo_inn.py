@@ -31,6 +31,7 @@ def load(params: dict) -> list[DiscriminatorData]:
             "add_log_layer_ens": params.get("add_log_layer_ens", False),
             "add_logit_step": params.get("add_logit_step", False),
 			"add_cut": params.get("add_cut", 0.0),
+            "add_logp": params.get("add_logp", False),
             }
     datasets_list = [
             {'level': 'low', 'normalize': False, 'label': p_lab+' Unnorm.', 'suffix': 'unnorm'},
@@ -40,11 +41,11 @@ def load(params: dict) -> list[DiscriminatorData]:
 
     for dataset in datasets_list:
         if dataset['level'] == 'low':
-            geant_sample = create_data(params['geant_file'], dataset, **preproc_kwargs)
-            gen_sample = create_data(params['generated_file'], dataset, **preproc_kwargs)
+            geant_sample, logp_geant = create_data(params['geant_file'], dataset, **preproc_kwargs)
+            gen_sample, logp_samp = create_data(params['generated_file'], dataset, **preproc_kwargs)
         elif dataset['level'] == 'high':
-            geant_sample = create_data_high(params['geant_file'], dataset, **preproc_kwargs)
-            gen_sample = create_data_high(params['generated_file'], dataset, **preproc_kwargs)
+            geant_sample, logp_geant = create_data_high(params['geant_file'], dataset, **preproc_kwargs)
+            gen_sample, logp_samp = create_data_high(params['generated_file'], dataset, **preproc_kwargs)
         else:
             raise ValueError('Classifier preprocessing running at unknown level.')
         
@@ -59,6 +60,24 @@ def load(params: dict) -> list[DiscriminatorData]:
             params["test_split"]
         )
         
+        if logp_geant is not None:
+            train_logp_true, test_logp_true, val_logp_true = split_data(
+                logp_geant,
+                params["train_split"],
+                params["test_split"]
+            )
+        else: 
+            test_logp_true = None
+        
+        if logp_samp is not None:
+            train_logp_fake, test_logp_fake, val_logp_fake = split_data(
+                logp_samp,
+                params["train_split"],
+                params["test_split"]
+            )
+        else:
+            test_logp_fake = None
+
         observables = []
         if dataset['level']=='low':
             observables = compute_observables(test_true, test_fake)
@@ -73,6 +92,7 @@ def load(params: dict) -> list[DiscriminatorData]:
                 val_true = val_true,
                 val_fake = val_fake,
                 observables = observables,
+                test_logw = test_logp_fake if logp_samp is not None else None
             )
         )
     return datasets
@@ -83,6 +103,13 @@ def create_data(data_path, dataset_list, **kwargs):
         lay_0 = f.get('layer_0')[:] / 1e5
         lay_1 = f.get('layer_1')[:] / 1e5
         lay_2 = f.get('layer_2')[:] / 1e5
+        if kwargs["add_logp"]:
+            if 'log_p' in f:
+                log_p = (f.get('log_p')[:]).T
+            else:
+                log_p = None
+        else:
+            log_p = None
     
     torch_dtype = torch.get_default_dtype()
     lay_0 = torch.tensor(lay_0).to(torch_dtype)
@@ -113,7 +140,7 @@ def create_data(data_path, dataset_list, **kwargs):
         data = torch.cat((data, en0_t, en1_t, en2_t), axis=1)
     if kwargs['add_logit_step']:
         raise ValueError('Not implemented yet')
-    return data.numpy()
+    return data.numpy(), log_p
 
 def create_data_high(data_path, dataset_list, **kwargs):
     cut = kwargs['add_cut']
@@ -122,6 +149,13 @@ def create_data_high(data_path, dataset_list, **kwargs):
         lay_0 = f.get('layer_0')[:] / 1e5
         lay_1 = f.get('layer_1')[:] / 1e5
         lay_2 = f.get('layer_2')[:] / 1e5
+        if kwargs["add_logp"]:
+            if 'log_p' in f:
+                log_p = (f.get("log_p")[:]).T
+            else:
+                log_p = None
+        else:
+            log_p = None
     torch_dtype = torch.get_default_dtype()
     
     incident_energy = torch.log10(torch.tensor(en_test).to(torch_dtype)*10.)
@@ -178,55 +212,169 @@ def create_data_high(data_path, dataset_list, **kwargs):
     ret = torch.from_numpy(np.hstack([ret1, ret2]))
 
     ret = torch.cat((ret, incident_energy), 1)
-    return ret.numpy()
+    return ret.numpy(), log_p
 
 def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Observable]:
     observables = []
-    phi0_true = center_of_energy(true_data[:,:288], 0, 'phi')
-    phi1_true = center_of_energy(true_data[:,288:432], 1, 'phi')
-    phi2_true = center_of_energy(true_data[:,432:504], 2, 'phi')
-
-    phi0_fake = center_of_energy(fake_data[:,:288], 0, 'phi')
-    phi1_fake = center_of_energy(fake_data[:,288:432], 1, 'phi')
-    phi2_fake = center_of_energy(fake_data[:,432:504], 2, 'phi')
-
-    sparsity0_true = layer_sparsity(true_data[:,:288], 0.0)
-    sparsity1_true = layer_sparsity(true_data[:,288:432], 0.0)
-    sparsity2_true = layer_sparsity(true_data[:,432:504], 0.0)
     
-    sparsity0_fake = layer_sparsity(fake_data[:,:288], 0.0)
-    sparsity1_fake = layer_sparsity(fake_data[:,288:432], 0.0)
-    sparsity2_fake = layer_sparsity(fake_data[:,432:504], 0.0)
+    lay_0_t, lay_1_t, lay_2_t = layer_split(true_data)
+    lay_0_f, lay_1_f, lay_2_f = layer_split(fake_data)
+    lay_2_t = lay_2_t[:,:72]
+    lay_2_f = lay_2_f[:,:72]
+
+    energy_true = energy_sum(true_data[:,:504])*1.e5
+    energy_fake = energy_sum(fake_data[:,:504])*1.e5
+
+    e_l0_t = lay_0_t.sum(1)*1.e3
+    e_l1_t = lay_1_t.sum(1)*1.e3
+    e_l2_t = lay_2_t.sum(1)*1.e3 + 2.0e-4
+
+    e_l0_f = lay_0_f.sum(1)*1.e3
+    e_l1_f = lay_1_f.sum(1)*1.e3
+    e_l2_f = lay_2_f.sum(1)*1.e3 + 2.0e-4
+
+    eta0_true = center_of_energy(lay_0_t, 0, 'eta')
+    eta1_true = center_of_energy(lay_1_t, 1, 'eta')
+    eta2_true = center_of_energy(lay_2_t, 2, 'eta')
+
+    eta0_fake = center_of_energy(lay_0_f, 0, 'eta')
+    eta1_fake = center_of_energy(lay_1_f, 1, 'eta')
+    eta2_fake = center_of_energy(lay_2_f, 2, 'eta')
+
+    phi0_true = center_of_energy(lay_0_t, 0, 'phi')
+    phi1_true = center_of_energy(lay_1_t, 1, 'phi')
+    phi2_true = center_of_energy(lay_2_t, 2, 'phi')
+
+    phi0_fake = center_of_energy(lay_0_f, 0, 'phi')
+    phi1_fake = center_of_energy(lay_1_f, 1, 'phi')
+    phi2_fake = center_of_energy(lay_2_f, 2, 'phi')
+
+    sparsity0_true = layer_sparsity(lay_0_t, 0.0)
+    sparsity1_true = layer_sparsity(lay_1_t, 0.0)
+    sparsity2_true = layer_sparsity(lay_2_t, 0.0)
+    
+    sparsity0_fake = layer_sparsity(lay_0_f, 0.0)
+    sparsity1_fake = layer_sparsity(lay_1_f, 0.0)
+    sparsity2_fake = layer_sparsity(lay_2_f, 0.0)
+
+    br0_true = n_brightest_voxel(lay_0_t, [1]).T.flatten()
+    br1_true = n_brightest_voxel(lay_1_t, [1]).T.flatten()
+    br2_true = n_brightest_voxel(lay_2_t, [1]).T.flatten()
+
+    br0_fake = n_brightest_voxel(lay_0_f, [1]).T.flatten()
+    br1_fake = n_brightest_voxel(lay_1_f, [1]).T.flatten()
+    br2_fake = n_brightest_voxel(lay_2_f, [1]).T.flatten()
 
     observables.extend([
         Observable(
+            true_data = br0_true,
+            fake_data = br0_fake,
+            tex_label = r"\text{brightest voxel layer 0}",
+            bins = np.linspace(0, 1, 80),
+            xscale = 'linear',
+            yscale = 'linear',
+            ),
+        Observable(
+            true_data = br1_true,
+            fake_data = br1_fake,
+            tex_label = r"\text{brightest voxel layer 1}",
+            bins = np.linspace(0, 1, 80),
+            xscale = 'linear',
+            yscale = 'linear',
+            ),
+        Observable(
+            true_data = br2_true,
+            fake_data = br2_fake,
+            tex_label = r"\text{brightest voxel layer 2}",
+            bins = np.linspace(0, 1, 80),
+            xscale = 'linear',
+            yscale = 'linear',
+            ),
+        Observable(
+            true_data = e_l0_t,
+            fake_data = e_l0_f,
+            tex_label = f'E_0',
+            bins = np.logspace(-1, 3, 100),
+            xscale = 'log',
+            yscale = 'log',
+            ),
+        Observable(
+            true_data = e_l1_t,
+            fake_data = e_l1_f,
+            tex_label = r'E_1',
+            bins = np.logspace(0, 4, 100),
+            xscale = 'log',
+            yscale = 'log',
+            ),
+        Observable(
+            true_data = e_l2_t,
+            fake_data = e_l2_f,
+            tex_label = r'E_2',
+            bins = np.logspace(-4, 2, 100),
+            xscale = 'log',
+            yscale = 'log',
+            ),
+ 
+        Observable(
+            true_data = energy_true,
+            fake_data = energy_fake,
+            tex_label = r'E_{tot}',
+            bins = np.linspace(0, 110, 50),
+            xscale = 'linear',
+            yscale = 'log',
+            ),
+        Observable(
+            true_data = eta0_true,
+            fake_data = eta0_fake,
+            tex_label = f'\eta_0',
+            bins = np.linspace(-100, 100 , 50),
+            xscale = 'linear',
+            yscale = 'log',
+            ),
+         Observable(
+            true_data = eta1_true,
+            fake_data = eta1_fake,
+            tex_label = f'\eta_1',
+            bins = np.linspace(-100, 100 , 50),
+            xscale = 'linear',
+            yscale = 'log',
+            ),
+        Observable(
+            true_data = eta2_true,
+            fake_data = eta2_fake,
+            tex_label = f'\eta_2',
+            bins = np.linspace(-100, 100 , 50),
+            xscale = 'linear',
+            yscale = 'log',
+            ),
+        Observable(
             true_data = phi0_true,
             fake_data = phi0_fake,
-            tex_label = f'phi0',
-            bins = np.linspace(-125, 125, 50),
+            tex_label = f'\phi_0',
+            bins = np.linspace(-100, 100 , 50),
             xscale = 'linear',
             yscale = 'log',
             ),
          Observable(
             true_data = phi1_true,
             fake_data = phi1_fake,
-            tex_label = f'phi1',
-            bins = np.linspace(-125, 125, 50),
+            tex_label = f'\phi_1',
+            bins = np.linspace(-100, 100 , 50),
             xscale = 'linear',
             yscale = 'log',
             ),
         Observable(
             true_data = phi2_true,
             fake_data = phi2_fake,
-            tex_label = f'phi2',
-            bins = np.linspace(-125, 125, 50),
+            tex_label = f'\phi_2',
+            bins = np.linspace(-100, 100 , 50),
             xscale = 'linear',
             yscale = 'log',
             ),
         Observable(
             true_data = sparsity0_true,
             fake_data = sparsity0_fake,
-            tex_label = f'sparsity0',
+            tex_label = r'\text{sparsity layer }0',
             bins = np.linspace(0, 1, 20),
             xscale = 'linear',
             yscale = 'linear',
@@ -234,7 +382,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
         Observable(
             true_data = sparsity1_true,
             fake_data = sparsity1_fake,
-            tex_label = f'sparsity1',
+            tex_label = r'\text{sparsity layer }1',
             bins = np.linspace(0, 1, 20),
             xscale = 'linear',
             yscale = 'linear',
@@ -242,7 +390,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
         Observable(
             true_data = sparsity2_true,
             fake_data = sparsity2_fake,
-            tex_label = f'sparsity2',
+            tex_label = r'\text{sparsity layer }2',
             bins = np.linspace(0, 1, 20),
             xscale = 'linear',
             yscale = 'linear',

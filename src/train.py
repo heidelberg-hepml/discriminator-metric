@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import numpy as np
+from sklearn.isotonic import IsotonicRegression
 
 from .model import Discriminator
 from .dataset import DiscriminatorData
@@ -266,6 +267,37 @@ class DiscriminatorTraining:
         else:
             return self.predict_single()
 
+    def predict_single_train(self):
+        """
+        Computes the classifier weights and loss for the test dataset.
+
+        Returns:
+            w_true: Classifier weights for truth samples from the test dataset
+            w_fake: Classifier weights for generated samples from the test dataset
+            clf_score: Classifier score for the test dataset
+        """
+        self.model.eval()
+        with torch.no_grad():
+            y_true = torch.cat([
+                self.model(x_true) for (x_true, ) in self.train_loader_true
+            ])
+            y_fake = torch.cat([
+                self.model(x_fake) for (x_fake, ) in self.train_loader_fake
+            ])
+            y_true_sig = y_true.sigmoid().flatten()
+            y_fake_sig = y_fake.sigmoid().flatten()
+            w_true = y_true_sig / (1 - y_true_sig)
+            w_fake = y_fake_sig / (1 - y_fake_sig)
+            min_size = min(len(y_true), len(y_fake))
+            clf_score = self.loss(
+                torch.cat((y_true[:min_size], y_fake[:min_size])),
+                torch.cat((
+                    torch.ones_like(y_true[:min_size]),
+                    torch.zeros_like(y_true[:min_size])
+                ))
+            )
+            return w_true.cpu().numpy(), w_fake.cpu().numpy(), clf_score.cpu().numpy()
+
 
     def predict_single(self):
         """
@@ -297,6 +329,30 @@ class DiscriminatorTraining:
                 ))
             )
             return w_true.cpu().numpy(), w_fake.cpu().numpy(), clf_score.cpu().numpy()
+
+    def calibrate_classifier(self, ):
+        """ reads in calibration data and performs a calibration with isotonic regression on test data"""
+        self.model.eval()
+        zeros = np.zeros_like(self.data.val_fake)
+        ones = np.zeros_like(self.data.val_true)
+        labels = np.concatenate((zeros, ones))
+        cal_data = np.concatenate((self.data.val_fake, self.data.val_true))
+
+        shuffle = np.random.permutation(len(cal_data))
+        labels = labels[shuffle]
+        cal_data = cal_data[shuffle]
+        print(cal_data.shape, labels.shape) 
+        input_vector, target_vector = cal_data, labels
+        output_vector = self.model(torch.tensor(input_vector, device=self.device))
+        print(input_vector.shape, target_vector.shape)
+        pred = torch.sigmoid(torch.tensor(output_vector))
+        target = torch.tensor(target_vector)
+        result_true = target.cpu().numpy()
+        result_pred = pred.cpu().numpy()
+        print(result_true.shape, result_pred.shape)
+        iso_reg = IsotonicRegression(out_of_bounds='clip', y_min=1e-6, y_max=1.-1e-6).fit(result_pred,
+                                                                                          result_true)
+        return iso_reg
 
 
     def save(self, name: str):
