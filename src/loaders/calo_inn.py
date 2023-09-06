@@ -225,13 +225,13 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
     energy_true = energy_sum(true_data[:,:504])*1.e5
     energy_fake = energy_sum(fake_data[:,:504])*1.e5
 
-    e_l0_t = lay_0_t.sum(1)*1.e3
-    e_l1_t = lay_1_t.sum(1)*1.e3
-    e_l2_t = lay_2_t.sum(1)*1.e3 + 2.0e-4
+    e_l0_t = lay_0_t.sum(1)*1.e2
+    e_l1_t = lay_1_t.sum(1)*1.e2
+    e_l2_t = lay_2_t.sum(1)*1.e2 + 2.0e-5
 
-    e_l0_f = lay_0_f.sum(1)*1.e3
-    e_l1_f = lay_1_f.sum(1)*1.e3
-    e_l2_f = lay_2_f.sum(1)*1.e3 + 2.0e-4
+    e_l0_f = lay_0_f.sum(1)*1.e2
+    e_l1_f = lay_1_f.sum(1)*1.e2
+    e_l2_f = lay_2_f.sum(1)*1.e2 + 2.0e-5
 
     eta0_true = center_of_energy(lay_0_t, 0, 'eta')
     eta1_true = center_of_energy(lay_1_t, 1, 'eta')
@@ -270,7 +270,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = br0_true,
             fake_data = br0_fake,
             tex_label = r"\text{brightest voxel layer 0}",
-            bins = np.linspace(0, 1, 80),
+            bins = np.linspace(0, 1, 40),
             xscale = 'linear',
             yscale = 'linear',
             ),
@@ -278,7 +278,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = br1_true,
             fake_data = br1_fake,
             tex_label = r"\text{brightest voxel layer 1}",
-            bins = np.linspace(0, 1, 80),
+            bins = np.linspace(0, 1, 40),
             xscale = 'linear',
             yscale = 'linear',
             ),
@@ -286,31 +286,31 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = br2_true,
             fake_data = br2_fake,
             tex_label = r"\text{brightest voxel layer 2}",
-            bins = np.linspace(0, 1, 80),
+            bins = np.linspace(0, 1, 40),
             xscale = 'linear',
             yscale = 'linear',
             ),
         Observable(
             true_data = e_l0_t,
             fake_data = e_l0_f,
-            tex_label = f'E_0',
-            bins = np.logspace(-1, 3, 100),
+            tex_label = r'E_0 [\text{GeV}]',
+            bins = np.logspace(-2, 4, 80),
             xscale = 'log',
             yscale = 'log',
             ),
         Observable(
             true_data = e_l1_t,
             fake_data = e_l1_f,
-            tex_label = r'E_1',
-            bins = np.logspace(0, 4, 100),
+            tex_label = r'E_1 [\text{GeV}]',
+            bins = np.logspace(-1, 4, 80),
             xscale = 'log',
             yscale = 'log',
             ),
         Observable(
             true_data = e_l2_t,
             fake_data = e_l2_f,
-            tex_label = r'E_2',
-            bins = np.logspace(-4, 2, 100),
+            tex_label = r'E_2 [\text{GeV}]',
+            bins = np.logspace(-5, 4, 80),
             xscale = 'log',
             yscale = 'log',
             ),
@@ -318,7 +318,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
         Observable(
             true_data = energy_true,
             fake_data = energy_fake,
-            tex_label = r'E_{tot}',
+            tex_label = r'E_{tot} [\text{GeV}]',
             bins = np.linspace(0, 110, 50),
             xscale = 'linear',
             yscale = 'log',
@@ -327,7 +327,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = eta0_true,
             fake_data = eta0_fake,
             tex_label = f'\eta_0',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),
@@ -335,7 +335,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = eta1_true,
             fake_data = eta1_fake,
             tex_label = f'\eta_1',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),
@@ -343,7 +343,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = eta2_true,
             fake_data = eta2_fake,
             tex_label = f'\eta_2',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),
@@ -351,7 +351,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = phi0_true,
             fake_data = phi0_fake,
             tex_label = f'\phi_0',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),
@@ -359,7 +359,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = phi1_true,
             fake_data = phi1_fake,
             tex_label = f'\phi_1',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),
@@ -367,7 +367,7 @@ def compute_observables(true_data: np.ndarray, fake_data: np.ndarray) -> list[Ob
             true_data = phi2_true,
             fake_data = phi2_fake,
             tex_label = f'\phi_2',
-            bins = np.linspace(-100, 100 , 50),
+            bins = np.linspace(-100, 100 , 40),
             xscale = 'linear',
             yscale = 'log',
             ),

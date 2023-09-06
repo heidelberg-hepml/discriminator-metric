@@ -65,11 +65,11 @@ def layer_sparsity(data, threshold, layer=None):
         or needs a layer_nr if data has size 2 (assuming it's a full shower).
     """
     if len(data.shape) == 3:
-        sparsity = (data > threshold).mean((1, 2))
+        sparsity = (~(data < threshold)).mean((1, 2)) # changed
     else:
         if layer is not None:
             data = layer_split(data)[layer]
-        sparsity = (data > threshold).mean(-1)
+        sparsity = (~(data > threshold)).mean(-1) # changed to ~ to align with the name of the observable
     return sparsity
 
 def n_brightest_voxel(data, num_brightest, ratio=True):

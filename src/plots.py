@@ -12,6 +12,8 @@ from sklearn.calibration import calibration_curve
 
 from .observable import Observable
 
+from .calo_plotting_helper import *
+
 Line = namedtuple(
     "Line",
     ["y", "y_err", "y_ref", "y_orig", "label", "color", "fill", "linestyle"],
@@ -200,24 +202,79 @@ class Plots:
         """
         plot calibration curve
         """
-        scores = np.concatenate((self.weights_fake, self.weights_true))
-        labels = np.concatenate((
-                    np.zeros_like(self.weights_fake),
-                    np.ones_like(self.weights_true))
-                    )
-        cls_output = scores/(1+scores)
-        prob_true, prob_pred = calibration_curve(labels, cls_output, n_bins=10)
-        
-        fig, ax = plt.subplots(figsize=(4, 3.5))
-        fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+        nlt, nlf = np.mean(self.weights_true < 1), np.mean(self.weights_fake < 1)
+        print(f"      ${nlt*100:.1f}\\%$ & ${nlf*100:.1f}\\%$ & ${(1-nlt)*100:.1f}\\%$ & ${(1-nlf)*100:.1f}\\%$")
+        with PdfPages(file) as pdf:
+            scores = np.concatenate((self.weights_fake, self.weights_true[:len(self.weights_fake)]))
+            labels = np.concatenate((
+                        np.zeros_like(self.weights_fake),
+                        np.ones_like(self.weights_true[:len(self.weights_fake)]))
+                        )
+            cls_output = scores/(1+scores)
 
-        ax.plot(prob_true, prob_pred, label='cal. curve')
-        ax.plot(np.linspace(0,1,10), np.linspace(0,1,10))
-        self.corner_text(ax, self.title, "right", "bottom", h_offset=0.15)
+            fig, ax = plt.subplots(figsize=(5, 4.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
 
-        ax.legend()
-        plt.savefig(file)
-        plt.close()
+            prob_true, prob_pred = calibration_curve(labels, cls_output, n_bins=30)
+            ax.plot(prob_true, prob_pred)
+            ax.plot([0,1], [0,1], color="k", ls="dashed")
+            self.corner_text(ax, self.title, "left", "top")
+            ax.set_xlabel("predicted probability")
+            ax.set_ylabel("fraction of positives")
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+            
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+            p_low, p_high = 1e-2, 1e+2
+            wc = np.logspace(np.log10(p_low), np.log10(p_high), 30)
+            #wc = np.linspace(p_low, p_high, 30)
+            n_true, n_fake = np.zeros_like(wc), np.zeros_like(wc)
+            for i, w in enumerate(wc):
+                n_true[i] = np.mean(self.weights_true < w)
+                n_fake[i] = np.mean(self.weights_fake < w)
+            
+            ax.plot(wc, n_true/n_fake, label=r"$w < w_c$")
+            ax.plot(wc, (1-n_true)/(1-n_fake), label=r"$w > w_c$")
+            ax.plot([p_low,p_high], [p_low,p_high], color="k", ls="dashed")
+            self.corner_text(ax, self.title, "left", "top")
+            ax.set_xlabel(r"$w_c$")
+            ax.set_ylabel(r"$N_\text{truth} / N_\text{gen}$")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlim(p_low, p_high)
+            ax.legend(frameon=False)
+
+            plt.savefig(pdf, format="pdf")
+            plt.close()
+            
+            fig, ax = plt.subplots(figsize=(4, 3.5))
+            fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.11,0.09,1.00,1.00))
+            wc_middle = (wc[1:] + wc[:-1]) / 2
+            true_bins, _ = np.histogram(self.weights_true, bins=wc)
+            fake_bins, _ = np.histogram(self.weights_fake, bins=wc)
+            true_bins_norm, fake_bins_norm = len(self.weights_true), len(self.weights_fake)
+            true_bins_err, fake_bins_err = np.sqrt(true_bins), np.sqrt(fake_bins)
+            ratio = (true_bins/true_bins_norm)/(fake_bins/fake_bins_norm)
+            ratio_err = ratio * np.sqrt(
+                (true_bins_err/true_bins)**2 + (fake_bins_err/fake_bins)**2
+            )
+            self.hist_line(ax, wc, ratio, ratio_err, label="", color=self.colors[0])
+            #ax.plot(wc_middle, true_bins/fake_bins)
+            #ax.plot(wc_middle, (1-n_true)/(1-n_fake), label=r"$w > w_c$")
+            ax.plot([p_low,p_high], [p_low,p_high], color="k", ls="dashed")
+            self.title = self.title
+            self.corner_text(ax, self.title, "left", "top")
+            self.corner_text(ax, 'Ep. 150', 'right', 'bottom')
+            ax.set_xlabel(r"$w_c$")
+            ax.set_ylabel(r"$N_\text{truth} / N_\text{gen}$")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlim(p_low, p_high)
+            #ax.legend(frameon=False)
+
+            plt.savefig(pdf, format="pdf")
+            plt.close()
 
     def plot_weight_hist(self, file: str):
         """
@@ -249,7 +306,7 @@ class Plots:
             )
             self.plot_single_weight_hist(
                 pdf,
-                bins=np.logspace(-2, 2, 50),
+                bins=np.logspace(-4, 4, 80),
                 xscale="log",
                 yscale="log",
                 secax=False,
@@ -603,13 +660,13 @@ class Plots:
                     density = True
                 )[0] for i in range(self.weights_fake.shape[1])
             ], axis=1)
-            #rw_mean = np.mean(rw_hists, axis=1)
-            #rw_std = np.std(rw_hists, axis=1)
-            rw_mean = np.median(rw_hists, axis=1)
-            rw_std = np.stack((
-                np.quantile(rw_hists, 0.159, axis=1),
-                np.quantile(rw_hists, 0.841, axis=1)
-            ), axis=0)
+            rw_mean = np.mean(rw_hists, axis=1)
+            rw_std = np.std(rw_hists, axis=1)
+            #rw_mean = np.median(rw_hists, axis=1)
+            #rw_std = np.stack((
+            #    np.quantile(rw_hists, 0.159, axis=1),
+            #    np.quantile(rw_hists, 0.841, axis=1)
+            #), axis=0)
         else:
             rw_mean = np.histogram(
                 observable.fake_data,
@@ -716,28 +773,49 @@ class Plots:
             #std_log_w_bgen = np.std(self.log_gen_weights, axis=1)
             #weights_fake = std_log_w_bgen
 
-        masks, labels = [], []
+        masks_t, labels_t = [], []
+        masks_f, labels_f = [], []
         for threshold in lower_thresholds:
-            masks.append(weights_fake < threshold)
-            labels.append(f"$w < {threshold}$")
+            masks_f.append(weights_fake < threshold)
+            labels_f.append(f"$w < {threshold}$")
         for threshold in upper_thresholds:
-            masks.append(weights_fake > threshold)
-            labels.append(f"$w > {threshold}$")
+            masks_t.append(self.weights_true > threshold)
+            labels_t.append(f"$w > {threshold}$")
+            #labels_t.append(f"$w > {threshold}"+r", E_2 < 10^{-4}$")
 
-        mks = self.showers_true[:, 432:504].sum(1) > 2.e-3
-        mks2 = self.showers_fake[:, 432:504].sum(1) > 2.e-3
+        mks = self.showers_true[:, 432:504].sum(1) > 2.e-4
+        mks2 = self.showers_fake[:, 432:504].sum(1) > 2.e-4
+        mks3 = self.showers_true[:, 432:504].sum(1) > 1.e-6
+        mks4 = self.showers_fake[:, 432:504].sum(1) > 1.e-6
+        
+        #mks_pi_f = n_brightest_voxel(self.showers_fake[:, 432:504], [1]).T.flatten() < 0.05
+        #mks_pi_t = n_brightest_voxel(self.showers_true[:, 432:504], [1]).T.flatten() < 0.05
+        #masks_t.append((masks_t[0]&mks3))
+        #masks_t[0] &= ~mks3
+        #labels_t.append(r"$w > 1.6, E_2 > 10^{-4}$")
+        #print(observable.tex_label, observable.fake_data[masks_f[0] & mks_pi_f].shape, observable.fake_data[mks_pi_f].shape)
+        #print(observable.tex_label, observable.true_data[masks_t[0] & mks_pi_t].shape, observable.true_data[mks_pi_t].shape)
         true_hist, _ = np.histogram(observable.true_data, bins=bins, density=True)
         fake_hist, _ = np.histogram(observable.fake_data, bins=bins, density=True)
         true_count, _ = np.histogram(observable.true_data, bins=bins, density=False)
 
-        hists = [
+        hists_f = [
             np.histogram(
-                observable.fake_data[mask],
+                observable.fake_data[mask_f],
                 bins=bins,
                 density=True
             )[0]
-            for mask in masks
+            for mask_f in masks_f
         ]
+        hists_t = [
+                np.histogram(
+                    observable.true_data[mask_t],
+                    bins=bins,
+                    density=True,
+                    )[0]
+                for mask_t in masks_t
+                ]
+
         lines = [
             Line(
                 y = fake_hist,
@@ -754,9 +832,13 @@ class Plots:
                 #fill = True
             ),
             *[
+                Line(y=hist, label=label, color=self.colors[0])
+                for hist, label, color in zip(hists_f, labels_f, self.colors)
+            ],
+            *[
                 Line(y=hist, label=label, color=color)
-                for hist, label, color in zip(hists, labels, self.colors)
-            ]
+                for hist, label, color in zip(hists_t, labels_t, self.colors[1:])
+                ]
         ]
         self.hist_plot(pdf, lines, bins, observable, show_ratios=True, show_weights=False)
 
@@ -863,6 +945,9 @@ class Plots:
             axs[0].legend(frameon=False, title=self.title)
             axs[0].set_ylabel("normalized")
             axs[0].set_yscale(observable.yscale)
+            #ad hoc for E1
+            if axs[0].get_ylim()[0]<1.e-4:
+                axs[0].set_ylim(bottom=1.0e-4)
             #self.corner_text(axs[0], self.title, "right", "top")
 
             if show_ratios:
@@ -918,6 +1003,8 @@ class Plots:
 
         dup_last = lambda a: np.append(a, a[-1])
 
+        alpha_factor = 0.4 if color == 'k' else 1.0
+
         if fill:
             ax.fill_between(
                 bins,
@@ -936,6 +1023,7 @@ class Plots:
                 color = color,
                 linewidth = 1.0,
                 where = "post",
+                alpha = 1.0*alpha_factor,
                 linestyle = linestyle
             )
         if y_err is not None:
@@ -950,7 +1038,7 @@ class Plots:
                 bins,
                 dup_last(y_high),
                 color = color,
-                alpha = 0.3,
+                alpha = 0.5*alpha_factor,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -958,7 +1046,7 @@ class Plots:
                 bins,
                 dup_last(y_low),
                 color = color,
-                alpha = 0.3,
+                alpha = 0.5*alpha_factor,
                 linewidth = 0.5,
                 where = "post"
             )
@@ -967,7 +1055,7 @@ class Plots:
                 dup_last(y_low),
                 dup_last(y_high),
                 facecolor = color,
-                alpha = 0.3,
+                alpha = 0.3*alpha_factor,
                 step = "post"
             )
     
@@ -986,14 +1074,17 @@ class Plots:
         bin2 = np.arange(0, 3, 1)
         bin3 = np.arange(0, 12, 1)
         bin4 = np.arange(0, 6, 1)
-
+        
+        mks = self.showers_true[:, 432:504].sum(1) > 2.e-3
+        mks2 = self.showers_fake[:, 432:504].sum(1) > 2.e-3
+ 
         with PdfPages(file) as pdf:
             for i, _ in enumerate(masks):
                 fig, ax = plt.subplots(1, 3, figsize=(15, 4))
             
-                lay_0 = self.showers_fake[masks[i]][:, :288].reshape(-1, 3, 96).mean(0)
-                lay_1 = self.showers_fake[masks[i]][:, 288:432].reshape(-1, 12, 12).mean(0)
-                lay_2 = self.showers_fake[masks[i]][:, 432:504].reshape(-1, 12, 6).mean(0)
+                lay_0 = self.showers_fake[masks[i] & ~mks2][:, :288].reshape(-1, 3, 96).mean(0)
+                lay_1 = self.showers_fake[masks[i] & ~mks2][:, 288:432].reshape(-1, 12, 12).mean(0)
+                lay_2 = self.showers_fake[masks[i] & ~mks2][:, 432:504].reshape(-1, 12, 6).mean(0)
 
                 img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', cmap='viridis', interpolation='none')
                 img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', cmap='viridis', interpolation='none')
@@ -1015,9 +1106,9 @@ class Plots:
 
             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
             
-            lay_0 = self.showers_fake[:, :288].reshape(-1, 3, 96).mean(0)
-            lay_1 = self.showers_fake[:, 288:432].reshape(-1, 12, 12).mean(0)
-            lay_2 = self.showers_fake[:, 432:504].reshape(-1, 12, 6).mean(0)
+            lay_0 = self.showers_fake[~mks2][:, :288].reshape(-1, 3, 96).mean(0)
+            lay_1 = self.showers_fake[~mks2][:, 288:432].reshape(-1, 12, 12).mean(0)
+            lay_2 = self.showers_fake[~mks2][:, 432:504].reshape(-1, 12, 6).mean(0)
 
             img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', interpolation='none')
             img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', interpolation='none')
@@ -1039,9 +1130,9 @@ class Plots:
 
             fig, ax = plt.subplots(1, 3, figsize=(15, 4))
             
-            lay_0 = self.showers_true[:, :288].reshape(-1, 3, 96).mean(0)
-            lay_1 = self.showers_true[:, 288:432].reshape(-1, 12, 12).mean(0)
-            lay_2 = self.showers_true[:, 432:504].reshape(-1, 12, 6).mean(0)
+            lay_0 = self.showers_true[~mks][:, :288].reshape(-1, 3, 96).mean(0)
+            lay_1 = self.showers_true[~mks][:, 288:432].reshape(-1, 12, 12).mean(0)
+            lay_2 = self.showers_true[~mks][:, 432:504].reshape(-1, 12, 6).mean(0)
 
             img0 = ax[0].imshow(lay_0, norm=LogNorm(1.e-7, 2.e-2), aspect='auto', interpolation='none')
             img1 = ax[1].imshow(lay_1, norm=LogNorm(1.e-6, 1.e-1), aspect='auto', interpolation='none')

@@ -131,8 +131,8 @@ def main():
                 lower_thresholds,
                 upper_thresholds
             )
-            plots.plot_avg_showers(doc.add_file(f"avg_showers_{data.suffix}.pdf"), 
-                    lower_thresholds, upper_thresholds)
+            #plots.plot_avg_showers(doc.add_file(f"avg_showers_{data.suffix}.pdf"), 
+            #        lower_thresholds, upper_thresholds)
 
 
 
