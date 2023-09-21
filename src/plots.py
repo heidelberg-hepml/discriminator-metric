@@ -408,6 +408,8 @@ class Plots:
             ax.set_xscale(xscale)
         ax.set_yscale(yscale)
         ax.set_xlim(bins[0], bins[-1])
+
+        ax.axvline(x=1.0, linewidth=1.0, color='k',linestyle='--')
         
         #adding Delta
         if secax:
@@ -423,7 +425,14 @@ class Plots:
         
         if yscale == "linear":
             ax.set_ylim(bottom=0)
-        ax.legend(frameon=False, title=self.title)
+        l = ax.legend(fancybox=True, framealpha=1.0, frameon=True, title=self.title, handlelength=0.0)
+        frame = l.get_frame()
+        frame.set_edgecolor('white')
+        frame.set_facecolor('white')
+        frame.set_alpha(1)
+        for i, text in enumerate(l.get_texts()):
+            text.set_color(self.colors[i+1])
+
         plt.savefig(pdf, format="pdf")
         plt.close()
 
@@ -896,7 +905,7 @@ class Plots:
             fig, axs = plt.subplots(
                 n_panels, 1,
                 sharex = True,
-                figsize = (6, 4.5),
+                figsize = (4, 4),
                 gridspec_kw = {"height_ratios": (4, 1, 1)[:n_panels], "hspace": 0.00}
             )
             fig.tight_layout(pad=0.0, w_pad=0.0, h_pad=0.0, rect=(0.08,0.08,0.99,0.98))

@@ -1,4 +1,4 @@
-run_name: calo_eplus
+run_name: calo_eplus_geant_bayes_final
 dtype: float64
 p_type: eplus
 
@@ -7,7 +7,7 @@ loader_module: calo_inn
 loader_params: 
   p_type: eplus   # gammas, eplus, pions
   geant_file: /remote/gpu06/favaro/discriminator-metric/data/calo_cls_geant/full_cls_eplus.hdf5
-  generated_file: /remote/gpu06/favaro/discriminator-metric/data/calo_bay_samples/samples_eplus.hdf5
+  generated_file: /remote/gpu06/favaro/discriminator-metric/data/calo_bay_samples/new_samples_eplus.hdf5
   add_log_energy: True
   add_log_layer_ens: True
   add_logit_step: False
@@ -31,11 +31,11 @@ std_init: -9.0
 lr: 1.e-3
 betas: [0.9, 0.99]
 weight_decay: 0.0
-epochs: 150
-batch_size: 512
+epochs: 200
+batch_size: 1000
 lr_scheduler: reduce_on_plateau
-lr_decay_factor: 0.1
-lr_patience: 250
+lr_decay_factor: 0.05
+lr_patience: 20
 checkpoint_interval: 5
 
 # Evaluation
@@ -44,6 +44,6 @@ lower_cluster_thresholds: [0.1]
 upper_cluster_thresholds: [2.0]
 
 #Plotting
-w_labels: [ placeh, Geant1, Geant2]
+w_labels: [ placeh, Geant, CaloINN]
 add_w_comb: False
 
