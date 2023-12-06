@@ -4,6 +4,19 @@ This tool makes it easy to train a classifier to reweight samples from a generat
 model. It comes with an extensive plotting pipeline that allows to inspect the classifier
 output to evaluate the performance of the generative network.
 
+This is the reference repository for the article "How to Understand Limitations of Generative Networks"
+The preprint is available at [https://arxiv.org/abs/2305.16774](https://arxiv.org/abs/2305.16774)
+
+We collect here all the datasets used to train the classifiers.
+Samples obtained from the generative models and truth generated events:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10277550.svg)](https://doi.org/10.5281/zenodo.10277550)
+
+Original JetNet dataset:
+Kansal, R., Duarte, J., Su, H., Orzari, B., Tomei, T., Pierini, M., Touranakou, M., Vlimant, J.-R., & Gunopulos, D. (2022). JetNet (Versione 2). Zenodo. [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.6975118.svg)](https://doi.org/10.5281/zenodo.6975118)
+
+CaloGAN dataset:
+Krause, C., & Shih, D. (2021). Electromagnetic Calorimeter Shower Images of CaloFlow. Zenodo. [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5904188.svg)](https://doi.org/10.5281/zenodo.5904188)
+
 ## Usage
 
 Training a discriminator:
