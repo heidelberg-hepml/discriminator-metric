@@ -4,7 +4,7 @@ This tool makes it easy to train a classifier to reweight samples from a generat
 model. It comes with an extensive plotting pipeline that allows to inspect the classifier
 output to evaluate the performance of the generative network.
 
-This is the reference repository for the article "How to Understand Limitations of Generative Networks"
+This is the reference repository for the article _"How to Understand Limitations of Generative Networks"_.
 The preprint is available at [https://arxiv.org/abs/2305.16774](https://arxiv.org/abs/2305.16774)
 
 We collect here all the datasets used to train the classifiers.
